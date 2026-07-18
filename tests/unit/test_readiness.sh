@@ -16,7 +16,8 @@ MOUNT_ROOT="${TARGET_FIXTURE}"
 mkdir -p \
     "${MOUNT_ROOT}/etc/sudoers.d" \
     "${MOUNT_ROOT}/etc/snapper/configs"
-printf 'UUID=root / btrfs subvol=@ 0 0\nUUID=efi /boot vfat defaults 0 2\n' >"${MOUNT_ROOT}/etc/fstab"
+# genfstab writes the Btrfs subvolume with a leading slash.
+printf 'UUID=root / btrfs rw,noatime,subvolid=256,subvol=/@ 0 0\nUUID=efi /boot vfat defaults 0 2\n' >"${MOUNT_ROOT}/etc/fstab"
 printf 'framework\n' >"${MOUNT_ROOT}/etc/hostname"
 printf 'LANG=en_US.UTF-8\n' >"${MOUNT_ROOT}/etc/locale.conf"
 printf 'KEYMAP=us\n' >"${MOUNT_ROOT}/etc/vconsole.conf"
@@ -25,10 +26,16 @@ printf '%%wheel ALL=(ALL:ALL) ALL\n' >"${MOUNT_ROOT}/etc/sudoers.d/10-wheel"
 printf 'SUBVOLUME="/"\n' >"${MOUNT_ROOT}/etc/snapper/configs/root"
 
 verify_core_target_configuration
+printf 'UUID=root / btrfs rw,noatime,subvol=/@home 0 0\nUUID=efi /boot vfat defaults 0 2\n' >"${MOUNT_ROOT}/etc/fstab"
+if verify_core_target_configuration >/dev/null 2>&1; then
+    printf '%s\n' 'not ok - a non-root Btrfs subvolume passed core readiness' >&2
+    exit 1
+fi
+printf 'UUID=root / btrfs rw,noatime,subvol=@ 0 0\nUUID=efi /boot vfat defaults 0 2\n' >"${MOUNT_ROOT}/etc/fstab"
 LUKS_ENABLED=false
 printf 'HOOKS=(base systemd filesystems)\n' >"${MOUNT_ROOT}/etc/mkinitcpio.conf"
 verify_core_target_configuration
-printf '%s\n' 'ok - core readiness matches encrypted and unencrypted initramfs profiles'
+printf '%s\n' 'ok - core readiness accepts genfstab root syntax and both encryption profiles'
 
 CALLS=""
 FAIL_CHECK=""

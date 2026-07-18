@@ -7,24 +7,64 @@ verify_target_file() {
     [[ "${DRY_RUN:-false}" == "true" ]] || [[ -s "${MOUNT_ROOT}$1" ]]
 }
 
+fstab_has_mountpoint() {
+    local fstab_path="$1"
+    local expected_mountpoint="$2"
+
+    awk -v expected_mountpoint="${expected_mountpoint}" \
+        '$1 !~ /^#/ && $2 == expected_mountpoint { found = 1 } END { exit !found }' \
+        "${fstab_path}"
+}
+
+fstab_has_root_subvolume() {
+    local fstab_path="$1"
+
+    awk '
+        $1 !~ /^#/ && $2 == "/" {
+            option_count = split($4, options, ",")
+            for (option_index = 1; option_index <= option_count; option_index++) {
+                if (options[option_index] == "subvol=@" || options[option_index] == "subvol=/@") {
+                    found = 1
+                }
+            }
+        }
+        END { exit !found }
+    ' "${fstab_path}"
+}
+
 verify_core_target_configuration() {
     local fstab_path="${MOUNT_ROOT}/etc/fstab"
     local mkinitcpio_path="${MOUNT_ROOT}/etc/mkinitcpio.conf"
 
-    verify_target_file /etc/fstab || return 1
-    verify_target_file /etc/hostname || return 1
-    verify_target_file /etc/locale.conf || return 1
-    verify_target_file /etc/vconsole.conf || return 1
-    verify_target_file /etc/mkinitcpio.conf || return 1
-    verify_target_file /etc/sudoers.d/10-wheel || return 1
-    verify_target_file /etc/snapper/configs/root || return 1
-    [[ "$(<"${MOUNT_ROOT}/etc/hostname")" == "${HOSTNAME}" ]] || return 1
-    grep -Fq 'subvol=@' "${fstab_path}" || return 1
-    grep -Fq '/boot' "${fstab_path}" || return 1
+    verify_target_file /etc/fstab || { error "Final readiness: /etc/fstab is missing or empty."; return 1; }
+    verify_target_file /etc/hostname || { error "Final readiness: /etc/hostname is missing or empty."; return 1; }
+    verify_target_file /etc/locale.conf || { error "Final readiness: /etc/locale.conf is missing or empty."; return 1; }
+    verify_target_file /etc/vconsole.conf || { error "Final readiness: /etc/vconsole.conf is missing or empty."; return 1; }
+    verify_target_file /etc/mkinitcpio.conf || { error "Final readiness: /etc/mkinitcpio.conf is missing or empty."; return 1; }
+    verify_target_file /etc/sudoers.d/10-wheel || { error "Final readiness: the wheel sudoers policy is missing."; return 1; }
+    verify_target_file /etc/snapper/configs/root || { error "Final readiness: the Snapper root profile is missing."; return 1; }
+    [[ "$(<"${MOUNT_ROOT}/etc/hostname")" == "${HOSTNAME}" ]] || {
+        error "Final readiness: the installed hostname does not match HOSTNAME."
+        return 1
+    }
+    fstab_has_root_subvolume "${fstab_path}" || {
+        error "Final readiness: /etc/fstab does not mount Btrfs subvolume @ as root."
+        return 1
+    }
+    fstab_has_mountpoint "${fstab_path}" /boot || {
+        error "Final readiness: /etc/fstab does not contain the /boot mount."
+        return 1
+    }
     if [[ "${LUKS_ENABLED}" == "true" ]]; then
-        grep -Fq 'sd-encrypt' "${mkinitcpio_path}"
+        grep -Fq 'sd-encrypt' "${mkinitcpio_path}" || {
+            error "Final readiness: sd-encrypt is missing from the encrypted initramfs profile."
+            return 1
+        }
     else
-        ! grep -Fq 'sd-encrypt' "${mkinitcpio_path}"
+        if grep -Fq 'sd-encrypt' "${mkinitcpio_path}"; then
+            error "Final readiness: sd-encrypt is present although disk encryption is disabled."
+            return 1
+        fi
     fi
 }
 

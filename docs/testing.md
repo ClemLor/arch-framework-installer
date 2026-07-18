@@ -30,6 +30,10 @@ Les tests d'intégration sur loop device exigent un environnement isolé dédié
 Le scénario complet doit d'abord être validé en VM UEFI avec TPM virtuel, puis
 manuellement sur le Framework après sauvegarde vérifiée.
 
+Le test de readiness reproduit la syntaxe `subvol=/@` émise par `genfstab` et
+vérifie aussi le profil historique `subvol=@`. Les autres sous-volumes ne sont
+jamais acceptés comme racine.
+
 En dry-run, une commande prospective absente produit un avertissement afin que
 le plan complet reste visible. La même absence est toujours bloquante en mode
 réel. Aucune fonction de rollback mutatrice n'est appelée après un dry-run.
