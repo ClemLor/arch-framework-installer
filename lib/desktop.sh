@@ -3,12 +3,16 @@
 if [[ -n "${ARCH_INSTALLER_DESKTOP_LOADED:-}" ]]; then return 0; fi
 readonly ARCH_INSTALLER_DESKTOP_LOADED="true"
 
-desktop_session_launcher_path() {
-    printf '/home/%s/.local/bin/start-dms-session' "${USERNAME}"
+desktop_lock_launcher_path() {
+    printf '/home/%s/.local/bin/lock-dms-session' "${USERNAME}"
 }
 
-desktop_autostart_path() {
-    printf '/home/%s/.config/autostart/dank-material-shell.desktop' "${USERNAME}"
+desktop_lock_unit_path() {
+    printf '/home/%s/.config/systemd/user/dms-lock-on-start.service' "${USERNAME}"
+}
+
+desktop_niri_wants_path() {
+    printf '/home/%s/.config/systemd/user/niri.service.wants' "${USERNAME}"
 }
 
 configure_graphical_session() {
@@ -47,53 +51,56 @@ user = \"greeter\"
 }
 
 configure_user_desktop() {
-    local autostart_path
     local launcher_path
-    local lock_command=''
+    local lock_unit_path
+    local niri_wants_path
 
-    launcher_path="$(desktop_session_launcher_path)"
-    autostart_path="$(desktop_autostart_path)"
+    launcher_path="$(desktop_lock_launcher_path)"
+    lock_unit_path="$(desktop_lock_unit_path)"
+    niri_wants_path="$(desktop_niri_wants_path)"
 
-    if [[ "${DMS_LOCK_ON_START}" == "true" ]]; then
-        lock_command='attempt=0
+    run_in_chroot test -f /usr/lib/systemd/user/dms.service || return 1
+    run_in_chroot install -d -m0755 -o "${USERNAME}" -g "${USERNAME}" \
+        "/home/${USERNAME}/.local/bin" "${niri_wants_path}" || return 1
+    run_in_chroot ln -sfn /usr/lib/systemd/user/dms.service \
+        "${niri_wants_path}/dms.service" || return 1
+
+    if [[ "${DMS_LOCK_ON_START}" != "true" ]]; then
+        return 0
+    fi
+
+    write_target_file "${launcher_path}" '#!/usr/bin/env bash
+set -u
+
+attempt=0
 while (( attempt < 100 )); do
     if dms ipc call lock lock >/dev/null 2>&1; then
-        wait "${dms_pid}"
-        exit $?
-    fi
-    if ! kill -0 "${dms_pid}" 2>/dev/null; then
-        wait "${dms_pid}"
-        exit $?
+        exit 0
     fi
     sleep 0.1
     ((attempt += 1))
 done
 
 # Auto-login must fail closed if the requested lock screen is unavailable.
-niri msg action quit --skip-confirmation >/dev/null 2>&1 || true
-wait "${dms_pid}"
-'
-    fi
+if niri msg action quit --skip-confirmation >/dev/null 2>&1; then
+    exit 0
+fi
+exit 1
+' || return 1
 
-    write_target_file "${launcher_path}" "#!/usr/bin/env bash
-set -u
+    write_target_file "${lock_unit_path}" "[Unit]
+Description=Lock the auto-login Niri session with DMS
+PartOf=niri.service
+After=dms.service
 
-dms run &
-dms_pid=\$!
-${lock_command}
-wait \"\${dms_pid}\"
+[Service]
+Type=oneshot
+ExecStart=${launcher_path}
 " || return 1
 
-    write_target_file "${autostart_path}" "[Desktop Entry]
-Type=Application
-Name=Dank Material Shell
-Comment=Start DMS after the Wayland session is ready
-Exec=${launcher_path}
-OnlyShowIn=niri;
-X-GNOME-Autostart-enabled=true
-" || return 1
-
-    run_in_chroot chown -R "${USERNAME}:${USERNAME}" "/home/${USERNAME}/.local" "/home/${USERNAME}/.config" || return 1
+    run_in_chroot ln -sfn ../dms-lock-on-start.service \
+        "${niri_wants_path}/dms-lock-on-start.service" || return 1
+    run_in_chroot chown "${USERNAME}:${USERNAME}" "${launcher_path}" "${lock_unit_path}" || return 1
     run_in_chroot chmod 0755 "${launcher_path}"
 }
 
@@ -114,12 +121,21 @@ verify_graphical_session() {
 }
 
 verify_user_desktop() {
-    local autostart_path
     local launcher_path
+    local lock_unit_path
+    local niri_wants_path
 
-    launcher_path="$(desktop_session_launcher_path)"
-    autostart_path="$(desktop_autostart_path)"
+    launcher_path="$(desktop_lock_launcher_path)"
+    lock_unit_path="$(desktop_lock_unit_path)"
+    niri_wants_path="$(desktop_niri_wants_path)"
+    [[ -L "${MOUNT_ROOT}${niri_wants_path}/dms.service" ]] || return 1
+
+    if [[ "${DMS_LOCK_ON_START}" != "true" ]]; then
+        return 0
+    fi
+
     verify_target_file "${launcher_path}" || return 1
-    verify_target_file "${autostart_path}" || return 1
+    verify_target_file "${lock_unit_path}" || return 1
+    [[ -L "${MOUNT_ROOT}${niri_wants_path}/dms-lock-on-start.service" ]] || return 1
     grep -Fq 'dms ipc call lock lock' "${MOUNT_ROOT}${launcher_path}"
 }

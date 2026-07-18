@@ -8,9 +8,14 @@ un dépôt de dotfiles séparé, appliqué avec GNU Stow après le premier déma
 ## Démarrage de la session
 
 `greetd` démarre automatiquement `niri-session` pour `USERNAME` lorsque
-`DESKTOP_AUTOLOGIN=true`. DMS est ensuite lancé par l'autostart XDG, donc après
-la création du socket Wayland. Le lanceur attend que l'IPC de DMS réponde, puis
-demande immédiatement le verrouillage avec `dms ipc call lock lock`.
+`DESKTOP_AUTOLOGIN=true`. L'installateur rattache l'unité utilisateur officielle
+`dms.service` à `niri.service`, équivalent reproductible de
+`systemctl --user add-wants niri.service dms.service`. DMS démarre ainsi avec
+la session Wayland et ses erreurs sont consultables avec
+`journalctl --user -u dms.service`.
+
+Une seconde unité utilisateur attend que l'IPC de DMS réponde, puis demande
+immédiatement le verrouillage avec `dms ipc call lock lock`.
 
 L'auto-login n'est accepté par la validation que si `DMS_LOCK_ON_START=true`.
 Si DMS ne peut pas établir son écran de verrouillage, le lanceur ferme la session

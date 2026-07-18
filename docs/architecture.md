@@ -45,7 +45,8 @@ le périphérique complet.
 Le bureau cible est Niri avec Dank Material Shell (`dms-shell-niri`). Les
 dotfiles restent dans un dépôt séparé et sont destinés à être appliqués avec
 GNU Stow après installation. `greetd` ouvre la session Niri en auto-login ;
-l'autostart XDG lance ensuite DMS dans l'environnement Wayland et verrouille la
-session. La configuration refuse l'auto-login lorsque ce verrouillage initial
-est désactivé. Après une déconnexion, `greetd` exécute le greeter graphique
-fourni par DMS ; `agreety` n'est pas utilisé par la configuration du projet.
+`niri.service` entraîne ensuite l'unité utilisateur officielle `dms.service`,
+puis une unité dédiée verrouille la session dès que l'IPC DMS est prêt. La
+configuration refuse l'auto-login lorsque ce verrouillage initial est désactivé.
+Après une déconnexion, `greetd` exécute le greeter graphique fourni par DMS ;
+`agreety` n'est pas utilisé par la configuration du projet.
