@@ -16,6 +16,8 @@ après le premier démarrage.
 
 Le paquet Arch fournissant le générateur systemd pour zram s'appelle
 `zram-generator` (le projet amont est nommé systemd/zram-generator).
+`jq` est installé pour vérifier les métadonnées JSON LUKS2 sans analyser la
+sortie tabulaire de `systemd-cryptenroll`.
 
 Toute nouvelle dépendance doit être documentée et disponible depuis un dépôt de
 confiance configuré dans l'ISO. Les logiciels AUR/propriétaires sont installés

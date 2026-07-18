@@ -92,3 +92,42 @@ capture_command() {
 
     "$@"
 }
+
+capture_logged_command() {
+    local started_at
+    local finished_at
+    local status
+    local rendered_command
+
+    if [[ "$#" -eq 0 ]]; then
+        error "capture_logged_command requires at least one argument."
+        return 1
+    fi
+
+    printf -v rendered_command '%q ' "$@"
+
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        log_message "DRY-RUN" "${rendered_command}"
+        printf '[DRY-RUN] ' >&2
+        format_command "$@" >&2
+        printf '\n' >&2
+        return 0
+    fi
+
+    if [[ "${VERBOSE}" == "true" ]]; then
+        printf '[COMMAND] ' >&2
+        format_command "$@" >&2
+        printf '\n' >&2
+    fi
+
+    started_at="$(date +%s)"
+    log_message "COMMAND" "start: ${rendered_command}"
+    if "$@"; then
+        status=0
+    else
+        status=$?
+    fi
+    finished_at="$(date +%s)"
+    log_message "COMMAND" "finish: status=${status} duration=$((finished_at - started_at))s command=${rendered_command}"
+    return "${status}"
+}

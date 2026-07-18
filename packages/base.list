@@ -4,6 +4,7 @@ btrfs-progs
 cryptsetup
 dosfstools
 gptfdisk
+jq
 linux
 linux-firmware
 linux-headers

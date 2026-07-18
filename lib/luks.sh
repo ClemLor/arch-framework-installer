@@ -45,7 +45,19 @@ close_luks_mapping() {
     run_command cryptsetup close "${LUKS_NAME}"
 }
 
+luks_has_tpm2_token() {
+    local metadata
+
+    metadata="$(capture_logged_command cryptsetup luksDump --dump-json-metadata "$(luks_device)")" || return 1
+    capture_logged_command jq --exit-status \
+        'any(.tokens[]?; .type == "systemd-tpm2")' <<<"${metadata}" >/dev/null
+}
+
 enroll_luks_tpm2() {
     [[ "${LUKS_ENABLED}" == "true" && "${TPM2_ENABLED}" == "true" ]] || return 0
-    run_command systemd-cryptenroll --tpm2-device=auto "$(luks_device)"
+    if [[ "${DRY_RUN:-false}" != "true" ]] && luks_has_tpm2_token; then
+        info "A systemd TPM2 token is already enrolled on $(luks_device)."
+        return 0
+    fi
+    run_command systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 "$(luks_device)"
 }

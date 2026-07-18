@@ -14,6 +14,7 @@ bash tests/unit/test_commands.sh
 bash tests/unit/test_uefi_detection.sh
 bash tests/unit/test_packages.sh
 bash tests/unit/test_tpm_detection.sh
+bash tests/unit/test_tpm_enrollment.sh
 bash tests/unit/test_encryption_modes.sh
 bash tests/unit/test_boot_modes.sh
 bash tests/unit/test_desktop_session.sh
