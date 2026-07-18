@@ -219,6 +219,20 @@ Le projet privilégie toujours un code clair à une optimisation prématurée.
 
 Toute décision importante doit être documentée avant d'être implémentée.
 
+## Exécution des commandes
+
+Les scripts ne doivent pas exécuter directement les commandes susceptibles de modifier le système.
+
+Ils doivent passer par une fonction commune chargée de :
+
+* journaliser la commande ;
+* gérer le mode simulation ;
+* détecter les erreurs ;
+* afficher un message compréhensible ;
+* interrompre l’installation en cas d’échec critique.
+
+Cette abstraction permet d’assurer un comportement homogène dans tous les modules.
+
 ---
 
 # Évolutions futures
