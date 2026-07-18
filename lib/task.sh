@@ -198,8 +198,7 @@ task_run_all() {
     done
 
     trap - INT TERM
-    TASK_CURRENT=""
-    TASK_PHASE=""
+    state_clear_current
 
     if [[ "${TASK_INTERRUPTED}" == "true" ]]; then
         return 130

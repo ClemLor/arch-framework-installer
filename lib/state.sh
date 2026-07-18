@@ -54,3 +54,9 @@ state_request_interrupt() {
     state_persist
     warn "Signal ${TASK_SIGNAL} received; cleanup and rollback will run."
 }
+
+state_clear_current() {
+    TASK_CURRENT=""
+    TASK_PHASE=""
+    state_persist
+}

@@ -25,7 +25,7 @@ project_root() {
         source_path="$(readlink "${source_path}")"
     done
 
-    cd "$(dirname "${source_path}")/.." >/dev/null 2>&1
+    cd "$(dirname "${source_path}")/.." >/dev/null 2>&1 || return 1
     pwd
 }
 
