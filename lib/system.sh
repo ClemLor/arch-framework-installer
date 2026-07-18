@@ -287,6 +287,39 @@ get_network_state() {
     fi
 }
 
+get_tpm2_device() {
+    local device_root="${TPM_DEVICE_ROOT:-/dev}"
+    local device
+
+    for device in "${device_root}/tpmrm0" "${device_root}/tpm0"; do
+        if [[ -e "${device}" ]]; then
+            printf '%s' "${device}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+get_tpm_version_major() {
+    local tpm_sysfs_root="${TPM_SYSFS_ROOT:-/sys/class/tpm}"
+    local version_file="${tpm_sysfs_root}/tpm0/tpm_version_major"
+
+    if [[ -r "${version_file}" ]]; then
+        trim "$(<"${version_file}")"
+    else
+        printf '%s' "unknown"
+    fi
+}
+
+has_tpm2_device() {
+    local version
+
+    get_tpm2_device >/dev/null || return 1
+    version="$(get_tpm_version_major)"
+    [[ "${version}" == "2" || "${version}" == "unknown" ]]
+}
+
 validate_live_environment() {
     if is_archiso_live_environment; then
         success "Arch Linux live environment detected."

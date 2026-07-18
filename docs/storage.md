@@ -42,9 +42,9 @@ Disk
 │      FAT32
 │      1 GiB
 │
-└── LUKS2
-       │
-       └── Btrfs
+└── System partition
+       ├── profil chiffré : LUKS2 → Btrfs
+       └── profil non chiffré : Btrfs direct
 ```
 
 ---
@@ -70,7 +70,7 @@ Une partition EFI trop petite devient rapidement une contrainte.
 
 # Chiffrement
 
-La totalité du système est chiffrée avec LUKS2.
+Le profil par défaut chiffre la totalité du système avec LUKS2.
 
 Seule la partition EFI reste non chiffrée.
 
@@ -80,6 +80,13 @@ Le chiffrement protège :
 - les fichiers système
 - les snapshots
 - les fichiers temporaires
+
+Pour une installation sans chiffrement ni passphrase, définir simultanément :
+
+```bash
+LUKS_ENABLED="false"
+TPM2_ENABLED="false"
+```
 
 ---
 
@@ -222,7 +229,7 @@ Les règles suivantes doivent toujours être respectées.
 - une seule partition système
 - une seule partition EFI
 - Btrfs partout
-- LUKS2 partout sauf EFI
+- LUKS2 partout sauf EFI dans le profil chiffré
 - compression activée
 - sous-volumes clairement séparés
 - partitionnement simple

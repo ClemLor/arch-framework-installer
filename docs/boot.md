@@ -5,6 +5,9 @@ contient l'exécutable EFI, les noyaux, initramfs et `limine.conf`. Deux entrée
 sont générées : `linux-lts` par défaut et `linux` en secours. L'initramfs utilise
 les hooks systemd et `sd-encrypt` pour ouvrir LUKS2 avant le montage Btrfs.
 
+Dans le profil non chiffré, `sd-encrypt` est retiré de l'initramfs et Limine
+identifie directement la partition Btrfs par son `PARTUUID`.
+
 Secure Boot est une préparation documentée, pas une activation automatique :
 l'enrôlement de clés firmware reste une opération distincte et récupérable.
 

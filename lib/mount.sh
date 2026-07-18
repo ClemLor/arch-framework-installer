@@ -8,7 +8,7 @@ btrfs_mount_options() { printf 'noatime,compress=%s:%s,ssd,space_cache=v2' "${BT
 mount_target_filesystems() {
     local device
     local options
-    device="$(luks_mapping_path)"
+    device="$(root_block_device)"
     options="$(btrfs_mount_options)"
     run_command mkdir -p "${MOUNT_ROOT}" || return 1
     run_command mount -o "${options},subvol=@" "${device}" "${MOUNT_ROOT}" || return 1

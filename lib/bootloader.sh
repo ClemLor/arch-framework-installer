@@ -4,13 +4,27 @@ if [[ -n "${ARCH_INSTALLER_BOOTLOADER_LOADED:-}" ]]; then return 0; fi
 readonly ARCH_INSTALLER_BOOTLOADER_LOADED="true"
 
 install_limine() {
-    local luks_uuid
+    local root_identifier
+    local kernel_command_line
     local configuration
-    if [[ "${DRY_RUN:-false}" == "true" ]]; then
-        luks_uuid="DRY-RUN-LUKS-UUID"
+
+    if [[ "${LUKS_ENABLED}" == "true" ]]; then
+        if [[ "${DRY_RUN:-false}" == "true" ]]; then
+            root_identifier="DRY-RUN-LUKS-UUID"
+        else
+            root_identifier="$(cryptsetup luksUUID "$(luks_device)")" || return 1
+        fi
+        kernel_command_line="rd.luks.name=${root_identifier}=${LUKS_NAME} root=/dev/mapper/${LUKS_NAME} rootflags=subvol=@ rw"
     else
-        luks_uuid="$(cryptsetup luksUUID "$(luks_device)")" || return 1
+        if [[ "${DRY_RUN:-false}" == "true" ]]; then
+            root_identifier="DRY-RUN-PARTUUID"
+        else
+            root_identifier="$(blkid -s PARTUUID -o value "$(get_system_partition_path)")" || return 1
+            [[ -n "${root_identifier}" ]] || { error "Unable to read the root partition PARTUUID."; return 1; }
+        fi
+        kernel_command_line="root=PARTUUID=${root_identifier} rootflags=subvol=@ rw"
     fi
+
     configuration="timeout: 5
 default_entry: 1
 
@@ -18,13 +32,13 @@ default_entry: 1
     protocol: linux
     kernel_path: boot():/vmlinuz-${DEFAULT_KERNEL}
     module_path: boot():/initramfs-${DEFAULT_KERNEL}.img
-    kernel_cmdline: rd.luks.name=${luks_uuid}=${LUKS_NAME} root=/dev/mapper/${LUKS_NAME} rootflags=subvol=@ rw
+    kernel_cmdline: ${kernel_command_line}
 
 /Arch Linux fallback
     protocol: linux
     kernel_path: boot():/vmlinuz-${FALLBACK_KERNEL}
     module_path: boot():/initramfs-${FALLBACK_KERNEL}.img
-    kernel_cmdline: rd.luks.name=${luks_uuid}=${LUKS_NAME} root=/dev/mapper/${LUKS_NAME} rootflags=subvol=@ rw
+    kernel_cmdline: ${kernel_command_line}
 "
     run_command mkdir -p "${MOUNT_ROOT}/boot/EFI/arch-limine" "${MOUNT_ROOT}/boot/EFI/BOOT" || return 1
     run_command cp "${MOUNT_ROOT}/usr/share/limine/BOOTX64.EFI" "${MOUNT_ROOT}/boot/EFI/arch-limine/BOOTX64.EFI" || return 1

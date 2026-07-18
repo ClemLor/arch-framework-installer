@@ -79,6 +79,22 @@ get_system_partition_path() {
     get_partition_path "${TARGET_DISK}" 2
 }
 
+get_system_partition_type_code() {
+    if [[ "${LUKS_ENABLED}" == "true" ]]; then
+        printf '%s' "8309"
+    else
+        printf '%s' "8304"
+    fi
+}
+
+get_system_partition_type_guid() {
+    if [[ "${LUKS_ENABLED}" == "true" ]]; then
+        printf '%s' "ca7d7ccb-63ed-4c53-861c-1742536059cc"
+    else
+        printf '%s' "4f68bce3-e8cd-4db1-96e7-fbcaf984b709"
+    fi
+}
+
 get_efi_end_mib() {
     local efi_size_mib
 
@@ -103,7 +119,9 @@ validate_partition_dependencies() {
 
 create_partition_table() {
     local efi_end_mib
+    local system_type_code
     efi_end_mib="$(get_efi_end_mib)" || return 1
+    system_type_code="$(get_system_partition_type_code)"
 
     run_command wipefs --all "${TARGET_DISK}" || return 1
     run_command sgdisk --zap-all "${TARGET_DISK}" || return 1
@@ -114,7 +132,7 @@ create_partition_table() {
         "${TARGET_DISK}" || return 1
     run_command sgdisk \
         --new="2:0:0" \
-        --typecode="2:8309" \
+        --typecode="2:${system_type_code}" \
         --change-name="2:${SYSTEM_PARTITION_LABEL}" \
         "${TARGET_DISK}" || return 1
     run_command partprobe "${TARGET_DISK}" || return 1
@@ -165,7 +183,7 @@ verify_partition_table() {
     efi_type="$(get_partition_type_guid "${efi_partition}")"
     system_type="$(get_partition_type_guid "${system_partition}")"
     [[ "${efi_type,,}" == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" ]] || return 1
-    [[ "${system_type,,}" == "ca7d7ccb-63ed-4c53-861c-1742536059cc" ]] || return 1
+    [[ "${system_type,,}" == "$(get_system_partition_type_guid)" ]] || return 1
     [[ "$(get_partition_label "${efi_partition}")" == "${EFI_PARTITION_LABEL}" ]] || return 1
     [[ "$(get_partition_label "${system_partition}")" == "${SYSTEM_PARTITION_LABEL}" ]] || return 1
 
@@ -299,11 +317,20 @@ show_planned_partition_layout() {
     local system_partition
     local efi_end_mib
     local disk_size_bytes
+    local system_filesystem
+    local system_purpose
 
     efi_partition="$(get_efi_partition_path)"
     system_partition="$(get_system_partition_path)"
     efi_end_mib="$(get_efi_end_mib)"
     disk_size_bytes="$(get_disk_size_bytes "${TARGET_DISK}")"
+    if [[ "${LUKS_ENABLED}" == "true" ]]; then
+        system_filesystem="LUKS2"
+        system_purpose="Encrypted Arch system"
+    else
+        system_filesystem="Btrfs"
+        system_purpose="Unencrypted Arch system"
+    fi
 
     section "Planned GPT layout"
 
@@ -329,20 +356,26 @@ show_planned_partition_layout() {
         "${system_partition}" \
         "next aligned" \
         "100%" \
-        "LUKS2" \
-        "Encrypted Arch system"
+        "${system_filesystem}" \
+        "${system_purpose}"
 
     printf '\n'
     printf '%-22s %s\n' "EFI label:" "${EFI_PARTITION_LABEL}"
     printf '%-22s %s\n' "System label:" "${SYSTEM_PARTITION_LABEL}"
-    printf '%-22s %s\n' "LUKS mapping:" "/dev/mapper/${LUKS_NAME}"
+    if [[ "${LUKS_ENABLED}" == "true" ]]; then
+        printf '%-22s %s\n' "LUKS mapping:" "/dev/mapper/${LUKS_NAME}"
+    else
+        printf '%-22s %s\n' "Encryption:" "disabled"
+    fi
     printf '%-22s %s\n' "Inner filesystem:" "${FILESYSTEM}"
 }
 
 show_partition_commands() {
     local efi_end_mib
+    local system_type_code
 
     efi_end_mib="$(get_efi_end_mib)"
+    system_type_code="$(get_system_partition_type_code)"
 
     section "Planned destructive commands"
 
@@ -359,7 +392,8 @@ show_partition_commands() {
         "${EFI_PARTITION_LABEL}" \
         "${TARGET_DISK}"
 
-    printf 'sgdisk --new=2:0:0 --typecode=2:8309 --change-name=2:%q %q\n' \
+    printf 'sgdisk --new=2:0:0 --typecode=2:%s --change-name=2:%q %q\n' \
+        "${system_type_code}" \
         "${SYSTEM_PARTITION_LABEL}" \
         "${TARGET_DISK}"
 

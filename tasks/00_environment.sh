@@ -12,6 +12,9 @@ task_environment_validate() {
     if [[ "${DRY_RUN}" != "true" ]]; then validate_uefi || return 1; fi
     validate_required_commands || return 1
     require_commands_for_mode "Package preflight" pacman || return 1
+    if [[ "${DRY_RUN}" != "true" ]] && [[ "${TPM2_ENABLED}" == "true" ]]; then
+        validate_tpm2_hardware || return 1
+    fi
     require_real_installation_enabled
 }
 task_environment_execute() {

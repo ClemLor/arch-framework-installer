@@ -13,7 +13,7 @@ create_btrfs_layout() {
     local device
     local temporary_mount
     local subvolume
-    device="$(luks_mapping_path)"
+    device="$(root_block_device)"
     temporary_mount="${MOUNT_ROOT}/.btrfs-root"
 
     run_command mkfs.btrfs --force --label "${BTRFS_LABEL}" "${device}" || return 1
@@ -30,7 +30,7 @@ verify_btrfs_layout() {
     local temporary_mount
     local subvolume
     [[ "${DRY_RUN:-false}" == "true" ]] && return 0
-    device="$(luks_mapping_path)"
+    device="$(root_block_device)"
     temporary_mount="${MOUNT_ROOT}/.btrfs-verify"
     [[ "$(blkid -s TYPE -o value "${device}")" == "btrfs" ]] || return 1
     mkdir -p "${temporary_mount}" || return 1

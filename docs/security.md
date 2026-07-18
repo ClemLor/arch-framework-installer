@@ -7,3 +7,20 @@ d'accès. Les secrets ne doivent pas apparaître dans les arguments ou journaux.
 
 Le profil installe `fprintd`, `fwupd`, active la maintenance SSD et refuse toute
 mutation hors ISO Arch, hors UEFI, en dry-run ou sans activation explicite.
+
+Lorsque `TPM2_ENABLED=true`, `/dev/tpmrm0` ou `/dev/tpm0` doit être disponible.
+Cette condition est vérifiée avant le partitionnement. Une VM sans vTPM doit
+utiliser `TPM2_ENABLED=false`; elle conservera le déverrouillage par passphrase.
+
+## Profil sans chiffrement
+
+Le chiffrement peut être entièrement désactivé avec :
+
+```bash
+LUKS_ENABLED="false"
+TPM2_ENABLED="false"
+```
+
+Btrfs est alors créé directement sur la partition système et aucune passphrase
+n'est demandée. Un mode LUKS « TPM uniquement » sans phrase de récupération
+n'est volontairement pas proposé.

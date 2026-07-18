@@ -2,7 +2,10 @@
 
 task_encryption_name() { printf 'LUKS2 encryption'; }
 task_encryption_validate() {
-    [[ "${LUKS_ENABLED}" == "true" ]] || { error "This profile requires LUKS."; return 1; }
+    if [[ "${LUKS_ENABLED}" != "true" ]]; then
+        [[ "${TPM2_ENABLED}" != "true" ]] || { error "TPM2 requires LUKS encryption."; return 1; }
+        return 0
+    fi
     validate_luks_dependencies || return 1
     [[ "${DRY_RUN}" == "true" ]] && return 0
     confirm_destructive_action "$(luks_device)" "Formatting $(luks_device) as LUKS2 is irreversible."

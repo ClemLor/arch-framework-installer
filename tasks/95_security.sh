@@ -2,7 +2,10 @@
 
 task_security_name() { printf 'Security and TPM2'; }
 task_security_validate() {
-    [[ "${TPM2_ENABLED}" != "true" ]] || require_commands_for_mode "TPM2" systemd-cryptenroll
+    if [[ "${TPM2_ENABLED}" == "true" ]]; then
+        validate_tpm2_hardware || return 1
+        require_commands_for_mode "TPM2" systemd-cryptenroll
+    fi
 }
 task_security_execute() { enroll_luks_tpm2 && run_in_chroot systemctl enable fstrim.timer fwupd-refresh.timer; }
 task_security_verify() {

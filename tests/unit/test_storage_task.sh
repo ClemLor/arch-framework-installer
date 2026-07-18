@@ -45,6 +45,7 @@ DRY_RUN=false
 EFI_SIZE=1GiB
 EFI_PARTITION_LABEL=EFI
 SYSTEM_PARTITION_LABEL=ARCH
+LUKS_ENABLED=true
 get_efi_partition_path() { printf /dev/mockdisk1; }
 get_system_partition_path() { printf /dev/mockdisk2; }
 sgdisk() { return 0; }
@@ -67,6 +68,10 @@ if verify_partition_table; then
 else
     assert_equal verified failed 'GPT type, labels, sizes and alignment are verified through mocks'
 fi
+
+LUKS_ENABLED=false
+assert_equal '8304' "$(get_system_partition_type_code)" 'unencrypted root uses the Linux x86-64 root GPT type'
+assert_equal '4f68bce3-e8cd-4db1-96e7-fbcaf984b709' "$(get_system_partition_type_guid)" 'unencrypted root GPT GUID is verified'
 
 printf '%d tests, %d failures\n' "${TESTS}" "${FAILURES}"
 ((FAILURES == 0))

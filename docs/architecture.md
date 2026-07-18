@@ -35,7 +35,7 @@ placés sous `logs/`.
 
 ## Ordre d'installation
 
-Environnement, sélection du disque, GPT, LUKS2, Btrfs, montages, pacstrap,
+Environnement, sélection du disque, GPT, LUKS2 optionnel, Btrfs, montages, pacstrap,
 configuration, paquets/services, utilisateur, Limine, TPM2/sécurité, cleanup et
 fin. Les opérations irréversibles exigent le mode réel et une confirmation sur
 le périphérique complet.

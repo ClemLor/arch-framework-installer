@@ -57,6 +57,19 @@ validate_uefi() {
     success "UEFI mode detected (firmware platform size: ${platform_size})."
 }
 
+validate_tpm2_hardware() {
+    local device
+
+    if ! has_tpm2_device; then
+        error "TPM2_ENABLED=true, but no TPM2 device is available."
+        error "For a VM, attach a virtual TPM 2.0 or set TPM2_ENABLED=false."
+        return 1
+    fi
+
+    device="$(get_tpm2_device)"
+    success "TPM2 device detected: ${device}."
+}
+
 validate_target_disk() {
     if [[ ! -b "${TARGET_DISK}" ]]; then
         error "Target disk does not exist: ${TARGET_DISK}"

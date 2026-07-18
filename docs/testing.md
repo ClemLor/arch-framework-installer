@@ -13,6 +13,9 @@ bash tests/unit/test_storage_task.sh
 bash tests/unit/test_commands.sh
 bash tests/unit/test_uefi_detection.sh
 bash tests/unit/test_packages.sh
+bash tests/unit/test_tpm_detection.sh
+bash tests/unit/test_encryption_modes.sh
+bash tests/unit/test_boot_modes.sh
 ```
 
 Les tests d'intégration sur loop device exigent un environnement isolé dédié.
