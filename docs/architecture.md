@@ -30,6 +30,8 @@ tâches terminées dans l'ordre inverse. INT et TERM empruntent le même chemin.
 `lib/state.sh` conserve la tâche et la phase courantes ainsi que la pile des
 tâches réussies dans `state/install.state`. Ce fichier sert au diagnostic : les
 tâches destructives ne sont jamais sautées automatiquement lors d'une reprise.
+Le dry-run ne crée ni ne met à jour ce fichier, ce qui évite qu'un état possédé
+par root après une installation empêche une simulation lancée sans `sudo`.
 `lib/progress.sh` affiche `[n/total]` et la durée. Les journaux horodatés sont
 placés sous `logs/`.
 

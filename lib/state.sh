@@ -15,6 +15,11 @@ STATE_FILE="${STATE_FILE:-}"
 
 state_init() {
     local root="$1"
+
+    if [[ "${DRY_RUN:-false}" == "true" ]] && [[ -z "${STATE_FILE}" ]]; then
+        return 0
+    fi
+
     mkdir -p "${root}/state" || return 1
     STATE_FILE="${STATE_FILE:-${root}/state/install.state}"
 }

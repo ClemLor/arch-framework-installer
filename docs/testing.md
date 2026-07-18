@@ -9,6 +9,7 @@ physique. `test_task_engine.sh` couvre le cycle et le rollback ;
 find install.sh lib tasks tests -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
 shellcheck install.sh lib/*.sh tasks/*.sh tests/unit/*.sh
 bash tests/unit/test_task_engine.sh
+bash tests/unit/test_state.sh
 bash tests/unit/test_storage_task.sh
 bash tests/unit/test_commands.sh
 bash tests/unit/test_uefi_detection.sh
