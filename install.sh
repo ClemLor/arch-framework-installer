@@ -20,6 +20,7 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLI_DRY_RUN="false"
 CLI_VERBOSE="false"
 INSPECT_MODE="false"
+STORAGE_PLAN_MODE="false"
 
 # shellcheck source=lib/logging.sh
 source "${SCRIPT_DIR}/lib/logging.sh"
@@ -42,6 +43,9 @@ source "${SCRIPT_DIR}/lib/system.sh"
 # shellcheck source=lib/disk.sh
 source "${SCRIPT_DIR}/lib/disk.sh"
 
+# shellcheck source=lib/partition.sh
+source "${SCRIPT_DIR}/lib/partition.sh"
+
 # shellcheck source=lib/validation.sh
 source "${SCRIPT_DIR}/lib/validation.sh"
 
@@ -51,15 +55,18 @@ Usage:
   ./install.sh [options]
 
 Options:
-  --config FILE   Use an alternative configuration file.
-  --dry-run       Display planned operations without changing the system.
-  --inspect       Inspect the host and disks, then exit.
-  --verbose       Display executed commands.
-  --help          Display this help.
+  --config FILE    Use an alternative configuration file.
+  --dry-run        Display planned operations without changing the system.
+  --inspect        Inspect the host and disks, then exit.
+  --plan-storage   Validate and display the planned disk layout, then exit.
+  --verbose        Display executed commands.
+  --help           Display this help.
 
 Examples:
   sudo ./install.sh --inspect
-  sudo ./install.sh --dry-run
+  sudo ./install.sh --inspect --dry-run
+  sudo ./install.sh --plan-storage
+  sudo ./install.sh --plan-storage --dry-run
   sudo ./install.sh --dry-run --verbose
 EOF
 }
@@ -81,6 +88,10 @@ parse_arguments() {
                 ;;
             --inspect)
                 INSPECT_MODE="true"
+                shift
+                ;;
+            --plan-storage)
+                STORAGE_PLAN_MODE="true"
                 shift
                 ;;
             --verbose)
@@ -108,23 +119,40 @@ apply_cli_overrides() {
     fi
 }
 
+validate_execution_mode() {
+    local selected_modes=0
+
+    if [[ "${INSPECT_MODE}" == "true" ]]; then
+        ((selected_modes += 1))
+    fi
+
+    if [[ "${STORAGE_PLAN_MODE}" == "true" ]]; then
+        ((selected_modes += 1))
+    fi
+
+    if ((selected_modes > 1)); then
+        fatal "--inspect and --plan-storage cannot be used together."
+    fi
+}
+
 show_installation_summary() {
     section "Installation configuration"
 
-    printf '%-20s %s\n' "Hostname:" "${HOSTNAME}"
-    printf '%-20s %s\n' "Target disk:" "${TARGET_DISK}"
-    printf '%-20s %s\n' "EFI size:" "${EFI_SIZE}"
-    printf '%-20s %s\n' "Filesystem:" "${FILESYSTEM}"
-    printf '%-20s %s\n' "Compression:" "${BTRFS_COMPRESSION}:${BTRFS_COMPRESSION_LEVEL}"
-    printf '%-20s %s\n' "Encryption:" "${LUKS_ENABLED}"
-    printf '%-20s %s\n' "TPM2:" "${TPM2_ENABLED}"
-    printf '%-20s %s\n' "Swap:" "${SWAP_SIZE}"
-    printf '%-20s %s\n' "Zram:" "${ZRAM_ENABLED}"
-    printf '%-20s %s\n' "Hibernation:" "${HIBERNATION_ENABLED}"
-    printf '%-20s %s\n' "Bootloader:" "${BOOTLOADER}"
-    printf '%-20s %s\n' "Default kernel:" "${DEFAULT_KERNEL}"
-    printf '%-20s %s\n' "Fallback kernel:" "${FALLBACK_KERNEL}"
-    printf '%-20s %s\n' "Dry run:" "${DRY_RUN}"
+    printf '%-22s %s\n' "Hostname:" "${HOSTNAME}"
+    printf '%-22s %s\n' "Target disk:" "${TARGET_DISK}"
+    printf '%-22s %s\n' "Minimum disk size:" "${MINIMUM_DISK_SIZE}"
+    printf '%-22s %s\n' "EFI size:" "${EFI_SIZE}"
+    printf '%-22s %s\n' "Filesystem:" "${FILESYSTEM}"
+    printf '%-22s %s\n' "Compression:" "${BTRFS_COMPRESSION}:${BTRFS_COMPRESSION_LEVEL}"
+    printf '%-22s %s\n' "Encryption:" "${LUKS_ENABLED}"
+    printf '%-22s %s\n' "TPM2:" "${TPM2_ENABLED}"
+    printf '%-22s %s\n' "Swap:" "${SWAP_SIZE}"
+    printf '%-22s %s\n' "Zram:" "${ZRAM_ENABLED}"
+    printf '%-22s %s\n' "Hibernation:" "${HIBERNATION_ENABLED}"
+    printf '%-22s %s\n' "Bootloader:" "${BOOTLOADER}"
+    printf '%-22s %s\n' "Default kernel:" "${DEFAULT_KERNEL}"
+    printf '%-22s %s\n' "Fallback kernel:" "${FALLBACK_KERNEL}"
+    printf '%-22s %s\n' "Dry run:" "${DRY_RUN}"
 }
 
 inspect_system() {
@@ -164,11 +192,18 @@ inspect_system() {
 
 main() {
     parse_arguments "$@"
+    validate_execution_mode
+
     load_config
     apply_cli_overrides
 
     if [[ "${INSPECT_MODE}" == "true" ]]; then
         inspect_system
+        exit 0
+    fi
+
+    if [[ "${STORAGE_PLAN_MODE}" == "true" ]]; then
+        show_storage_plan
         exit 0
     fi
 
