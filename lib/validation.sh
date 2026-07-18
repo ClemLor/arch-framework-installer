@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 
 # ==============================================================================
@@ -99,4 +98,3 @@ validate_environment() {
 
     success "Environment validation completed."
 }
-```

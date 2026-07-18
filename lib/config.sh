@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 
 # ==============================================================================
@@ -128,4 +127,3 @@ validate_config() {
 
     success "Configuration is valid."
 }
-```
