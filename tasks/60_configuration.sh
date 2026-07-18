@@ -20,16 +20,14 @@ task_configuration_execute() {
     fi
     write_target_file /etc/mkinitcpio.conf "${mkinitcpio_hooks}
 " || return 1
-    write_target_file /etc/systemd/zram-generator.conf '[zram0]
-zram-size = ram / 2
-compression-algorithm = zstd
-' || return 1
+    configure_zram || return 1
     configure_snapper || return 1
     configure_graphical_session
 }
 task_configuration_verify() {
     verify_target_file /etc/fstab &&
         verify_target_file /etc/hostname &&
+        verify_zram_configuration &&
         verify_graphical_session
 }
 task_configuration_cleanup() { return 0; }

@@ -33,6 +33,11 @@ tâches destructives ne sont jamais sautées automatiquement lors d'une reprise.
 `lib/progress.sh` affiche `[n/total]` et la durée. Les journaux horodatés sont
 placés sous `logs/`.
 
+La configuration mémoire respecte `ZRAM_ENABLED`. Lorsqu'il est actif,
+`zram-generator` crée un périphérique compressé en Zstd limité à la moitié de la
+RAM. Lorsqu'il est désactivé, seul le fichier de configuration géré par
+l'installateur dans la cible est retiré.
+
 ## Ordre d'installation
 
 Environnement, sélection du disque, GPT, LUKS2 optionnel, Btrfs, montages, pacstrap,

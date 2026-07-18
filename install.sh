@@ -73,6 +73,8 @@ source "${SCRIPT_DIR}/lib/services.sh"
 source "${SCRIPT_DIR}/lib/desktop.sh"
 # shellcheck source=lib/snapshots.sh
 source "${SCRIPT_DIR}/lib/snapshots.sh"
+# shellcheck source=lib/memory.sh
+source "${SCRIPT_DIR}/lib/memory.sh"
 # shellcheck source=lib/users.sh
 source "${SCRIPT_DIR}/lib/users.sh"
 # shellcheck source=lib/bootloader.sh
