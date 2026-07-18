@@ -8,6 +8,13 @@ source "${ROOT}/lib/common.sh"
 source "${ROOT}/lib/commands.sh"
 source "${ROOT}/lib/pacstraps.sh"
 
+if collect_packages | grep -Fxq nano; then
+    printf '%s\n' 'ok - nano is included for TTY recovery'
+else
+    printf '%s\n' 'not ok - nano is missing from the package set' >&2
+    exit 1
+fi
+
 collect_packages() { printf '%s\n' base unavailable-package; }
 pacman() {
     [[ "${*: -1}" != "unavailable-package" ]]

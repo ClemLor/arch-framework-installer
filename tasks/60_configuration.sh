@@ -24,8 +24,13 @@ task_configuration_execute() {
 zram-size = ram / 2
 compression-algorithm = zstd
 ' || return 1
-    configure_snapper
+    configure_snapper || return 1
+    configure_graphical_session
 }
-task_configuration_verify() { verify_target_file /etc/fstab && verify_target_file /etc/hostname; }
+task_configuration_verify() {
+    verify_target_file /etc/fstab &&
+        verify_target_file /etc/hostname &&
+        verify_graphical_session
+}
 task_configuration_cleanup() { return 0; }
 task_configuration_rollback() { return 0; }

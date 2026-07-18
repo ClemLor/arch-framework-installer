@@ -7,3 +7,7 @@ retour système mais ne remplacent jamais une sauvegarde.
 
 Le partitionnement, `luksFormat` et `mkfs` sont irréversibles : aucun rollback
 automatique ne prétend restaurer les anciennes données.
+
+`nano` fait partie des paquets de base installés afin de pouvoir corriger la
+configuration, les unités systemd et les fichiers de démarrage directement
+depuis un TTY ou un environnement de récupération minimal.

@@ -69,6 +69,8 @@ source "${SCRIPT_DIR}/lib/pacstraps.sh"
 source "${SCRIPT_DIR}/lib/packages.sh"
 # shellcheck source=lib/services.sh
 source "${SCRIPT_DIR}/lib/services.sh"
+# shellcheck source=lib/desktop.sh
+source "${SCRIPT_DIR}/lib/desktop.sh"
 # shellcheck source=lib/snapshots.sh
 source "${SCRIPT_DIR}/lib/snapshots.sh"
 # shellcheck source=lib/users.sh
@@ -194,6 +196,9 @@ show_installation_summary() {
     printf '%-22s %s\n' "Bootloader:" "${BOOTLOADER}"
     printf '%-22s %s\n' "Default kernel:" "${DEFAULT_KERNEL}"
     printf '%-22s %s\n' "Fallback kernel:" "${FALLBACK_KERNEL}"
+    printf '%-22s %s\n' "Desktop:" "${DESKTOP_COMPOSITOR} + ${DESKTOP_SHELL}"
+    printf '%-22s %s\n' "Desktop auto-login:" "${DESKTOP_AUTOLOGIN}"
+    printf '%-22s %s\n' "DMS lock on start:" "${DMS_LOCK_ON_START}"
     printf '%-22s %s\n' "Dry run:" "${DRY_RUN}"
 }
 

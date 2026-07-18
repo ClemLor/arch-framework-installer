@@ -177,6 +177,8 @@ validate_config() {
         DRY_RUN
         INTERACTIVE_CONFIRMATION
         ENABLE_REAL_INSTALLATION
+        DESKTOP_AUTOLOGIN
+        DMS_LOCK_ON_START
     )
 
     for variable_name in "${boolean_variables[@]}"; do
@@ -225,6 +227,11 @@ validate_config() {
 
     if [[ "${DESKTOP_COMPOSITOR}" != "niri" ]] || [[ "${DESKTOP_SHELL}" != "dank" ]]; then
         error "The supported desktop profile is niri with dank."
+        has_error="true"
+    fi
+
+    if [[ "${DESKTOP_AUTOLOGIN}" == "true" ]] && [[ "${DMS_LOCK_ON_START}" != "true" ]]; then
+        error "DESKTOP_AUTOLOGIN=true requires DMS_LOCK_ON_START=true."
         has_error="true"
     fi
 

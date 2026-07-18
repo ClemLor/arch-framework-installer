@@ -11,6 +11,7 @@ linux-lts
 linux-lts-headers
 limine
 mkinitcpio
+nano
 networkmanager
 sudo
 zram-generator
