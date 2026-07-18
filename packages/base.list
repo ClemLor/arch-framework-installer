@@ -13,4 +13,4 @@ limine
 mkinitcpio
 networkmanager
 sudo
-systemd-zram-generator
+zram-generator
