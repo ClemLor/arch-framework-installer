@@ -26,11 +26,18 @@ bash tests/unit/test_config_values.sh
 bash tests/unit/test_user_configuration.sh
 bash tests/unit/test_services.sh
 bash tests/unit/test_readiness.sh
+bash tests/unit/test_vm_validator.sh
 ```
 
 Les tests d'intégration sur loop device exigent un environnement isolé dédié.
 Le scénario complet doit d'abord être validé en VM UEFI avec TPM virtuel, puis
 manuellement sur le Framework après sauvegarde vérifiée.
+
+Après le redémarrage de la VM, `tests/vm/validate_installation.sh` vérifie en
+lecture seule le montage Btrfs, Limine, le profil LUKS2/TPM2, les paquets et
+services, la session Niri/DMS et zram. Les profils attendus sont fournis
+explicitement en arguments afin que le test ne valide pas simplement l'état
+qu'il découvre.
 
 Le test de readiness reproduit la syntaxe `subvol=/@` émise par `genfstab` et
 vérifie aussi le profil historique `subvol=@`. Les autres sous-volumes ne sont
