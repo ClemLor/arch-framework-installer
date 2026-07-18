@@ -8,6 +8,17 @@ les hooks systemd et `sd-encrypt` pour ouvrir LUKS2 avant le montage Btrfs.
 Dans le profil non chiffré, `sd-encrypt` est retiré de l'initramfs et Limine
 identifie directement la partition Btrfs par son `PARTUUID`.
 
+Lorsque TPM2 est activé, la ligne noyau ajoute
+`rd.luks.options=<UUID>=tpm2-device=auto` afin que systemd utilise le jeton
+LUKS2 enrôlé, tout en conservant la passphrase comme solution de récupération.
+Le hook `microcode` de mkinitcpio produit une image combinée ; aucune image
+microcode séparée n'est nécessaire dans `limine.conf`.
+
+Les exécutables EFI principal et de secours sont comparés au binaire fourni par
+le paquet Limine. Un hook pacman local les redéploie après chaque installation
+ou mise à jour de `limine`. La vérification exige également les noyaux et
+initramfs `linux-lts` et `linux`, ainsi que leurs deux entrées de menu.
+
 Secure Boot est une préparation documentée, pas une activation automatique :
 l'enrôlement de clés firmware reste une opération distincte et récupérable.
 

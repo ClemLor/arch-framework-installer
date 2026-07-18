@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
 task_bootloader_name() { printf 'Limine bootloader'; }
-task_bootloader_validate() { [[ "${BOOTLOADER}" == "limine" ]]; }
+task_bootloader_validate() {
+    [[ "${BOOTLOADER}" == "limine" ]] || return 1
+    require_commands_for_mode "Limine bootloader" arch-chroot blkid
+}
 task_bootloader_execute() { install_limine; }
 task_bootloader_verify() { verify_limine; }
 task_bootloader_cleanup() { return 0; }
