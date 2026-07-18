@@ -40,10 +40,13 @@ l'installateur dans la cible est retiré.
 
 ## Ordre d'installation
 
-Environnement, sélection du disque, GPT, LUKS2 optionnel, Btrfs, montages, pacstrap,
-configuration, paquets/services, utilisateur, Limine, TPM2/sécurité, cleanup et
-fin. Les opérations irréversibles exigent le mode réel et une confirmation sur
-le périphérique complet.
+Environnement, sélection du disque, GPT, LUKS2 optionnel, Btrfs, montages,
+pacstrap, configuration, paquets/services, utilisateur, Limine, TPM2/sécurité,
+vérification finale, cleanup et fin. Avant le démontage, la tâche de readiness
+revalide les montages, la configuration, tous les paquets et services, le compte
+utilisateur, le bureau, zram, Limine et le profil LUKS/TPM2. Les opérations
+irréversibles exigent le mode réel et une confirmation sur le périphérique
+complet.
 
 ## Desktop
 

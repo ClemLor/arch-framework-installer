@@ -22,6 +22,7 @@ bash tests/unit/test_zram_configuration.sh
 bash tests/unit/test_config_values.sh
 bash tests/unit/test_user_configuration.sh
 bash tests/unit/test_services.sh
+bash tests/unit/test_readiness.sh
 ```
 
 Les tests d'intégration sur loop device exigent un environnement isolé dédié.
