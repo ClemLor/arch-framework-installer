@@ -39,12 +39,22 @@ validate_architecture() {
 }
 
 validate_uefi() {
+    local platform_size
+
     if ! is_uefi_system; then
-        error "The system was not booted in UEFI mode."
+        error "UEFI firmware data is unavailable at /sys/firmware/efi."
+        error "Boot the USB entry prefixed with 'UEFI:' and disable Legacy/CSM mode."
+        error "On the Arch ISO, verify with: cat /sys/firmware/efi/fw_platform_size"
         return 1
     fi
 
-    success "UEFI mode detected."
+    platform_size="$(get_uefi_platform_size)"
+    if [[ "${platform_size}" == "32" ]]; then
+        error "A 32-bit UEFI was detected; this installer deploys the 64-bit BOOTX64.EFI loader."
+        return 1
+    fi
+
+    success "UEFI mode detected (firmware platform size: ${platform_size})."
 }
 
 validate_target_disk() {

@@ -11,6 +11,7 @@ shellcheck install.sh lib/*.sh tasks/*.sh tests/unit/*.sh
 bash tests/unit/test_task_engine.sh
 bash tests/unit/test_storage_task.sh
 bash tests/unit/test_commands.sh
+bash tests/unit/test_uefi_detection.sh
 ```
 
 Les tests d'intégration sur loop device exigent un environnement isolé dédié.

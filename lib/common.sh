@@ -44,7 +44,27 @@ require_root() {
 }
 
 is_uefi_system() {
-    [[ -d /sys/firmware/efi/efivars ]]
+    local efi_root="${EFI_SYSFS_ROOT:-/sys/firmware/efi}"
+    local platform_size
+
+    [[ -d "${efi_root}" ]] || return 1
+
+    if [[ -r "${efi_root}/fw_platform_size" ]]; then
+        platform_size="$(<"${efi_root}/fw_platform_size")"
+        [[ "${platform_size}" == "32" || "${platform_size}" == "64" ]] || return 1
+    fi
+
+    return 0
+}
+
+get_uefi_platform_size() {
+    local efi_root="${EFI_SYSFS_ROOT:-/sys/firmware/efi}"
+
+    if [[ -r "${efi_root}/fw_platform_size" ]]; then
+        trim "$(<"${efi_root}/fw_platform_size")"
+    else
+        printf '%s' "unknown"
+    fi
 }
 
 is_architecture_supported() {
