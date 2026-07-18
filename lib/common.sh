@@ -59,3 +59,35 @@ trim() {
 
     printf '%s' "${value}"
 }
+
+require_real_installation_enabled() {
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        return 0
+    fi
+
+    if [[ "${ENABLE_REAL_INSTALLATION:-false}" != "true" ]]; then
+        error "Real installation is disabled. Set ENABLE_REAL_INSTALLATION=true after reviewing a dry-run."
+        return 1
+    fi
+}
+
+require_commands_for_mode() {
+    local context="$1"
+    shift
+    local command
+    local -a missing=()
+
+    for command in "$@"; do
+        command_exists "${command}" || missing+=("${command}")
+    done
+
+    (( ${#missing[@]} == 0 )) && return 0
+
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        warn "${context}: commands unavailable but not executed in dry-run: ${missing[*]}"
+        return 0
+    fi
+
+    error "${context}: missing required commands: ${missing[*]}"
+    return 1
+}

@@ -1,0 +1,5 @@
+NetworkManager.service
+fstrim.timer
+power-profiles-daemon.service
+snapper-cleanup.timer
+snapper-timeline.timer

@@ -184,21 +184,7 @@ Ils ne remplacent pas une sauvegarde.
 
 # Swap
 
-Le système utilise :
-
-- un swapfile
-- zram
-
-## Swapfile
-
-Taille :
-
-32 Go
-
-Utilisé pour :
-
-- l'hibernation
-- les charges mémoire importantes
+Le système utilise uniquement zram. Aucun swapfile persistant n'est créé.
 
 ## zram
 
@@ -207,7 +193,7 @@ Utilisé pour :
 - améliorer la réactivité
 - réduire les accès disque
 
-Les deux mécanismes sont complémentaires.
+L'hibernation est désactivée car zram ne constitue pas un espace de reprise persistant.
 
 ---
 
@@ -274,7 +260,7 @@ BTRFS_COMPRESSION="zstd"
 BTRFS_COMPRESSION_LEVEL="3"
 
 # Memory
-SWAP_SIZE="32GiB"
+SWAP_SIZE="0GiB"
 ZRAM_ENABLED="true"
 ```
 
@@ -347,3 +333,11 @@ Les évolutions possibles comprennent notamment :
 - amélioration de la politique Snapper
 
 Toute évolution doit conserver la compatibilité avec les installations existantes.
+
+## Implémentation réelle
+
+`tasks/10_storage.sh` applique le plan GPT uniquement depuis l'ISO Arch en UEFI,
+avec `ENABLE_REAL_INSTALLATION=true`, après validation du disque et saisie de son
+chemin complet. Le moteur utilise `wipefs`, `sgdisk`, `partprobe` et
+`udevadm settle`, attend les deux périphériques et vérifie GPT, types et
+alignement. Le rollback ne prétend jamais restaurer les données détruites.

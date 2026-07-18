@@ -75,7 +75,7 @@ validate_size_value() {
     local variable_name="$1"
     local value="${!variable_name:-}"
 
-    if [[ ! "${value}" =~ ^[1-9][0-9]*(MiB|GiB|TiB)$ ]]; then
+    if [[ ! "${value}" =~ ^[0-9]+(MiB|GiB|TiB)$ ]]; then
         error "${variable_name} must use the format 1024MiB, 32GiB or 1TiB."
         return 1
     fi
@@ -155,6 +155,12 @@ validate_config() {
         DEFAULT_KERNEL
         FALLBACK_KERNEL
         BOOTLOADER
+        MOUNT_ROOT
+        USERNAME
+        USER_SHELL
+        USER_GROUPS
+        DESKTOP_COMPOSITOR
+        DESKTOP_SHELL
     )
 
     for variable_name in "${required_variables[@]}"; do
@@ -170,6 +176,7 @@ validate_config() {
         HIBERNATION_ENABLED
         DRY_RUN
         INTERACTIVE_CONFIRMATION
+        ENABLE_REAL_INSTALLATION
     )
 
     for variable_name in "${boolean_variables[@]}"; do
@@ -213,6 +220,31 @@ validate_config() {
 
     if [[ "${BOOTLOADER}" != "limine" ]]; then
         error "Only Limine is currently supported."
+        has_error="true"
+    fi
+
+    if [[ "${DESKTOP_COMPOSITOR}" != "niri" ]] || [[ "${DESKTOP_SHELL}" != "dank" ]]; then
+        error "The supported desktop profile is niri with dank."
+        has_error="true"
+    fi
+
+    if [[ "${MOUNT_ROOT}" != /* ]] || [[ "${MOUNT_ROOT}" == "/" ]]; then
+        error "MOUNT_ROOT must be an absolute path other than /."
+        has_error="true"
+    fi
+
+    if [[ "${LUKS_ENABLED}" != "true" ]] && [[ "${TPM2_ENABLED}" == "true" ]]; then
+        error "TPM2_ENABLED requires LUKS_ENABLED=true."
+        has_error="true"
+    fi
+
+    if [[ "${SWAP_SIZE}" != "0MiB" ]] && [[ "${SWAP_SIZE}" != "0GiB" ]]; then
+        error "Disk swap is unsupported; SWAP_SIZE must be 0MiB or 0GiB (zram is used)."
+        has_error="true"
+    fi
+
+    if [[ "${HIBERNATION_ENABLED}" == "true" ]]; then
+        error "Hibernation requires persistent swap and is not supported by the zram-only design."
         has_error="true"
     fi
 

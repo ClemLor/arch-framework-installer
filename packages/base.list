@@ -1,0 +1,16 @@
+base
+base-devel
+btrfs-progs
+cryptsetup
+dosfstools
+gptfdisk
+linux
+linux-firmware
+linux-headers
+linux-lts
+linux-lts-headers
+limine
+mkinitcpio
+networkmanager
+sudo
+systemd-zram-generator

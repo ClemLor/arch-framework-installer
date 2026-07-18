@@ -21,6 +21,7 @@ CLI_DRY_RUN="false"
 CLI_VERBOSE="false"
 INSPECT_MODE="false"
 STORAGE_PLAN_MODE="false"
+PARTITION_ONLY_MODE="false"
 
 # shellcheck source=lib/logging.sh
 source "${SCRIPT_DIR}/lib/logging.sh"
@@ -49,6 +50,37 @@ source "${SCRIPT_DIR}/lib/partition.sh"
 # shellcheck source=lib/validation.sh
 source "${SCRIPT_DIR}/lib/validation.sh"
 
+# shellcheck source=lib/state.sh
+source "${SCRIPT_DIR}/lib/state.sh"
+# shellcheck source=lib/progress.sh
+source "${SCRIPT_DIR}/lib/progress.sh"
+# shellcheck source=lib/luks.sh
+source "${SCRIPT_DIR}/lib/luks.sh"
+# shellcheck source=lib/btrfs.sh
+source "${SCRIPT_DIR}/lib/btrfs.sh"
+# shellcheck source=lib/mount.sh
+source "${SCRIPT_DIR}/lib/mount.sh"
+# shellcheck source=lib/chroot.sh
+source "${SCRIPT_DIR}/lib/chroot.sh"
+# shellcheck source=lib/pacstraps.sh
+source "${SCRIPT_DIR}/lib/pacstraps.sh"
+# shellcheck source=lib/packages.sh
+source "${SCRIPT_DIR}/lib/packages.sh"
+# shellcheck source=lib/services.sh
+source "${SCRIPT_DIR}/lib/services.sh"
+# shellcheck source=lib/snapshots.sh
+source "${SCRIPT_DIR}/lib/snapshots.sh"
+# shellcheck source=lib/users.sh
+source "${SCRIPT_DIR}/lib/users.sh"
+# shellcheck source=lib/bootloader.sh
+source "${SCRIPT_DIR}/lib/bootloader.sh"
+# shellcheck source=lib/verify.sh
+source "${SCRIPT_DIR}/lib/verify.sh"
+# shellcheck source=lib/hooks.sh
+source "${SCRIPT_DIR}/lib/hooks.sh"
+# shellcheck source=lib/task.sh
+source "${SCRIPT_DIR}/lib/task.sh"
+
 usage() {
     cat <<'EOF'
 Usage:
@@ -59,6 +91,7 @@ Options:
   --dry-run        Display planned operations without changing the system.
   --inspect        Inspect the host and disks, then exit.
   --plan-storage   Validate and display the planned disk layout, then exit.
+  --partition      Run tasks through real partitioning, then stop.
   --verbose        Display executed commands.
   --help           Display this help.
 
@@ -92,6 +125,10 @@ parse_arguments() {
                 ;;
             --plan-storage)
                 STORAGE_PLAN_MODE="true"
+                shift
+                ;;
+            --partition)
+                PARTITION_ONLY_MODE="true"
                 shift
                 ;;
             --verbose)
@@ -130,8 +167,12 @@ validate_execution_mode() {
         ((selected_modes += 1))
     fi
 
+    if [[ "${PARTITION_ONLY_MODE}" == "true" ]]; then
+        ((selected_modes += 1))
+    fi
+
     if ((selected_modes > 1)); then
-        fatal "--inspect and --plan-storage cannot be used together."
+        fatal "--inspect, --plan-storage and --partition are mutually exclusive."
     fi
 }
 
@@ -196,6 +237,8 @@ main() {
 
     load_config
     apply_cli_overrides
+    init_logging "${SCRIPT_DIR}"
+    state_init "${SCRIPT_DIR}"
 
     if [[ "${INSPECT_MODE}" == "true" ]]; then
         inspect_system
@@ -207,12 +250,16 @@ main() {
         exit 0
     fi
 
-    show_installation_summary
-    validate_live_environment
-    validate_environment
+    if [[ "${PARTITION_ONLY_MODE}" == "true" ]]; then
+        TASK_STOP_AFTER="storage"
+    fi
 
-    success "Installer foundations are working."
-    info "No installation operation has been implemented yet."
+    if ! task_run_all "${SCRIPT_DIR}/tasks"; then
+        error "Installation workflow failed. See ${LOG_FILE}."
+        return 1
+    fi
+
+    success "Installation workflow completed. Log: ${LOG_FILE}"
 }
 
 main "$@"

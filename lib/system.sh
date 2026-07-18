@@ -296,7 +296,7 @@ validate_live_environment() {
     if [[ "${DRY_RUN:-false}" == "true" ]] ||
         [[ "${INSPECT_MODE:-false}" == "true" ]]; then
         warn "The current system is not detected as the Arch Linux live ISO."
-        warn "Inspection is allowed, but a real installation must run from the live ISO."
+        warn "Dry-run and inspection are allowed, but a real installation must run from the live ISO."
         return 0
     fi
 
@@ -331,4 +331,25 @@ show_system_inspection() {
     printf '%-20s %s\n' "Firmware vendor:" "$(get_firmware_vendor)"
     printf '%-20s %s\n' "Firmware version:" "$(get_firmware_version)"
     printf '%-20s %s\n' "Network:" "$(get_network_state)"
+}
+
+configure_installed_system() {
+    local locale_content
+    locale_content="${LOCALE} UTF-8
+${SECONDARY_LOCALE} UTF-8
+"
+    run_in_chroot ln -sf "/usr/share/zoneinfo/${TIMEZONE}" /etc/localtime || return 1
+    run_in_chroot hwclock --systohc || return 1
+    write_target_file /etc/locale.gen "${locale_content}" || return 1
+    run_in_chroot locale-gen || return 1
+    write_target_file /etc/locale.conf "LANG=${LOCALE}
+" || return 1
+    write_target_file /etc/vconsole.conf "KEYMAP=${KEYMAP}
+" || return 1
+    write_target_file /etc/hostname "${HOSTNAME}
+" || return 1
+    write_target_file /etc/hosts "127.0.0.1 localhost
+::1 localhost
+127.0.1.1 ${HOSTNAME}.localdomain ${HOSTNAME}
+"
 }

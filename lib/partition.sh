@@ -89,26 +89,97 @@ get_efi_end_mib() {
 }
 
 validate_partition_dependencies() {
-    local missing_commands=()
     local required_commands=(
         lsblk
         sgdisk
         wipefs
+        partprobe
+        udevadm
     )
-    local required_command
-
-    for required_command in "${required_commands[@]}"; do
-        if ! command_exists "${required_command}"; then
-            missing_commands+=("${required_command}")
-        fi
-    done
-
-    if (( ${#missing_commands[@]} > 0 )); then
-        error "Missing storage commands: ${missing_commands[*]}"
-        return 1
-    fi
+    require_commands_for_mode "Storage" "${required_commands[@]}" || return 1
 
     success "Storage planning commands are available."
+}
+
+create_partition_table() {
+    local efi_end_mib
+    efi_end_mib="$(get_efi_end_mib)" || return 1
+
+    run_command wipefs --all "${TARGET_DISK}" || return 1
+    run_command sgdisk --zap-all "${TARGET_DISK}" || return 1
+    run_command sgdisk \
+        --new="1:1MiB:${efi_end_mib}MiB" \
+        --typecode="1:ef00" \
+        --change-name="1:${EFI_PARTITION_LABEL}" \
+        "${TARGET_DISK}" || return 1
+    run_command sgdisk \
+        --new="2:0:0" \
+        --typecode="2:8309" \
+        --change-name="2:${SYSTEM_PARTITION_LABEL}" \
+        "${TARGET_DISK}" || return 1
+    run_command partprobe "${TARGET_DISK}" || return 1
+    run_command udevadm settle || return 1
+}
+
+wait_for_partition_devices() {
+    local attempt
+    local efi_partition
+    local system_partition
+
+    [[ "${DRY_RUN:-false}" == "true" ]] && return 0
+    efi_partition="$(get_efi_partition_path)"
+    system_partition="$(get_system_partition_path)"
+
+    for ((attempt=0; attempt<20; attempt++)); do
+        if [[ -b "${efi_partition}" ]] && [[ -b "${system_partition}" ]]; then
+            return 0
+        fi
+        sleep 1
+    done
+
+    error "Partition devices did not appear within 20 seconds."
+    return 1
+}
+
+verify_partition_table() {
+    local efi_partition
+    local system_partition
+    local partition_count
+    local efi_type
+    local system_type
+    local disk_size_bytes
+    local efi_size_bytes
+    local system_size_bytes
+    local expected_efi_size_bytes
+    local unallocated_bytes
+
+    [[ "${DRY_RUN:-false}" == "true" ]] && return 0
+    efi_partition="$(get_efi_partition_path)"
+    system_partition="$(get_system_partition_path)"
+
+    sgdisk --verify "${TARGET_DISK}" >/dev/null || return 1
+    [[ "$(get_disk_partition_table "${TARGET_DISK}")" == "gpt" ]] || return 1
+    partition_count="$(get_disk_partition_count "${TARGET_DISK}")"
+    [[ "${partition_count}" -eq 2 ]] || return 1
+
+    efi_type="$(get_partition_type_guid "${efi_partition}")"
+    system_type="$(get_partition_type_guid "${system_partition}")"
+    [[ "${efi_type,,}" == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" ]] || return 1
+    [[ "${system_type,,}" == "ca7d7ccb-63ed-4c53-861c-1742536059cc" ]] || return 1
+    [[ "$(get_partition_label "${efi_partition}")" == "${EFI_PARTITION_LABEL}" ]] || return 1
+    [[ "$(get_partition_label "${system_partition}")" == "${SYSTEM_PARTITION_LABEL}" ]] || return 1
+
+    disk_size_bytes="$(get_disk_size_bytes "${TARGET_DISK}")"
+    efi_size_bytes="$(get_disk_size_bytes "${efi_partition}")"
+    system_size_bytes="$(get_disk_size_bytes "${system_partition}")"
+    expected_efi_size_bytes="$(size_to_bytes "${EFI_SIZE}")" || return 1
+    (( efi_size_bytes >= expected_efi_size_bytes - 1048576 )) || return 1
+    (( efi_size_bytes <= expected_efi_size_bytes + 1048576 )) || return 1
+    (( efi_size_bytes + system_size_bytes <= disk_size_bytes )) || return 1
+    unallocated_bytes=$((disk_size_bytes - efi_size_bytes - system_size_bytes))
+    (( unallocated_bytes <= 4194304 )) || return 1
+    is_partition_mib_aligned "${efi_partition}" || return 1
+    is_partition_mib_aligned "${system_partition}" || return 1
 }
 
 validate_target_disk_capacity() {
@@ -205,7 +276,8 @@ validate_storage_plan() {
     validate_efi_partition_size || validation_failed="true"
 
     if [[ "${validation_failed}" == "true" ]]; then
-        fatal "Storage plan validation failed."
+        error "Storage plan validation failed."
+        return 1
     fi
 
     success "Storage plan validation completed."
@@ -255,7 +327,7 @@ show_planned_partition_layout() {
     printf '%-5s %-22s %-14s %-14s %-14s %s\n' \
         "2" \
         "${system_partition}" \
-        "${efi_end_mib}MiB" \
+        "next aligned" \
         "100%" \
         "LUKS2" \
         "Encrypted Arch system"
@@ -287,8 +359,7 @@ show_partition_commands() {
         "${EFI_PARTITION_LABEL}" \
         "${TARGET_DISK}"
 
-    printf 'sgdisk --new=2:%sMiB:0 --typecode=2:8309 --change-name=2:%q %q\n' \
-        "${efi_end_mib}" \
+    printf 'sgdisk --new=2:0:0 --typecode=2:8309 --change-name=2:%q %q\n' \
         "${SYSTEM_PARTITION_LABEL}" \
         "${TARGET_DISK}"
 

@@ -25,12 +25,20 @@ format_command() {
 }
 
 run_command() {
+    local started_at
+    local finished_at
+    local status
+    local rendered_command
+
     if [[ "$#" -eq 0 ]]; then
         error "run_command requires at least one argument."
         return 1
     fi
 
+    printf -v rendered_command '%q ' "$@"
+
     if [[ "${DRY_RUN}" == "true" ]]; then
+        log_message "DRY-RUN" "${rendered_command}"
         printf '[DRY-RUN] '
         format_command "$@"
         printf '\n'
@@ -43,7 +51,18 @@ run_command() {
         printf '\n'
     fi
 
-    "$@"
+    started_at="$(date +%s)"
+    log_message "COMMAND" "start: ${rendered_command}"
+
+    if "$@"; then
+        status=0
+    else
+        status=$?
+    fi
+
+    finished_at="$(date +%s)"
+    log_message "COMMAND" "finish: status=${status} duration=$((finished_at - started_at))s command=${rendered_command}"
+    return "${status}"
 }
 
 run_critical() {
@@ -53,7 +72,8 @@ run_critical() {
     info "${description}"
 
     if ! run_command "$@"; then
-        fatal "Failed: ${description}"
+        error "Failed: ${description}"
+        return 1
     fi
 }
 

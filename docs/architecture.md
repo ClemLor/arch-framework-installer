@@ -1,249 +1,47 @@
 # Architecture
 
-## Objectif
+`install.sh` est l'unique point d'entrée. Il charge la configuration, applique
+les surcharges CLI, initialise le journal puis délègue au moteur de tâches.
+Les modes `--inspect` et `--plan-storage` restent strictement en lecture seule ;
+`--partition` arrête le moteur après le stockage.
 
-L'objectif de cette architecture est de séparer clairement les responsabilités de chaque composant du projet.
+## Couches
 
-Chaque dossier possède un rôle unique et ne doit pas contenir d'éléments qui ne lui appartiennent pas.
-
-Cette organisation permet de rendre le projet simple à comprendre, facile à maintenir et facilement extensible.
-
----
-
-# Vue d'ensemble
-
-```
-arch-framework-installer/
-├── assets/
-├── config/
-├── docs/
-├── lib/
-├── packages/
-├── scripts/
-├── services/
-├── tests/
-├── install.sh
-├── bootstrap.sh
-└── PROJECT.md
-```
-
----
-
-# Organisation
-
-## assets/
-
-Contient les ressources statiques utilisées par le projet.
-
-Exemples :
-
-- logos
-- captures d'écran
-- illustrations
-- modèles
-
-Aucun fichier de configuration ne doit être placé ici.
-
----
-
-## config/
-
-Contient uniquement les fichiers de configuration utilisés par les scripts.
-
-Exemples :
-
-- variables
-- paramètres utilisateur
-- listes de modules
-- options d'installation
-
-Les scripts lisent ces fichiers mais ne les modifient jamais.
-
----
-
-## docs/
-
-Documentation complète du projet.
-
-Chaque domaine possède son propre document.
-
-Exemples :
-
-- storage.md
-- boot.md
-- security.md
-- desktop.md
-
----
-
-## lib/
-
-Bibliothèque de fonctions.
-
-Chaque fichier correspond à un domaine technique.
-
-Exemples :
-
-```
-disk.sh
-btrfs.sh
-luks.sh
-boot.sh
-network.sh
-users.sh
-desktop.sh
-```
-
-Les fichiers de ce dossier ne doivent jamais être exécutés directement.
-
-Ils sont uniquement importés par les scripts.
-
----
-
-## packages/
-
-Définition des paquets à installer.
-
-Les listes sont séparées par catégories.
-
-Exemple :
-
-```
-base.conf
-desktop.conf
-development.conf
-fonts.conf
-```
-
-Les scripts utilisent ces listes pour installer les paquets.
-
----
-
-## scripts/
-
-Scripts exécutables.
-
-Chaque script réalise une tâche complète.
-
-Exemples :
-
-- install.sh
-- update.sh
-- health-check.sh
-
-Les scripts utilisent les fonctions présentes dans `lib/`.
-
----
-
-## services/
-
-Contient les unités systemd fournies par le projet.
-
-Exemples :
-
-- timers
-- services utilisateur
-- services système
-
----
-
-## tests/
-
-Tests automatiques.
-
-Chaque module important possède ses propres tests.
-
-Les tests permettent de vérifier que les scripts restent fonctionnels après les modifications.
-
----
-
-# Flux d'installation
-
-L'installation suit les étapes suivantes :
-
-```
+```text
 install.sh
-        │
-        ▼
-Lecture de la configuration
-        │
-        ▼
-Préparation du disque
-        │
-        ▼
-Installation d'Arch Linux
-        │
-        ▼
-Configuration du système
-        │
-        ▼
-Installation du chargeur de démarrage
-        │
-        ▼
-Premier démarrage
-        │
-        ▼
-bootstrap.sh
-        │
-        ▼
-Installation des applications
-        │
-        ▼
-Application des dotfiles
-        │
-        ▼
-Système opérationnel
+  ├─ config/system.conf
+  ├─ lib/        fonctions de domaine et orchestration
+  └─ tasks/      unités ordonnées et vérifiables
 ```
 
----
+L'inspection matérielle appartient à `lib/system.sh` et `lib/disk.sh`. La
+construction et la vérification GPT appartiennent à `lib/partition.sh`. Toutes
+les mutations passent par `run_command`, qui applique le dry-run et journalise
+commande, durée et statut.
 
-# Principes d'architecture
+## Moteur de tâches
 
-## Une responsabilité par fichier
+`lib/task.sh` découvre `tasks/[0-9][0-9]_*.sh` avec un tri déterministe. Chaque
+tâche expose `name`, `validate`, `execute`, `verify`, `cleanup` et `rollback`.
+Le cycle normal est `validate → execute → verify → cleanup`. Un échec déclenche
+le cleanup, le rollback prudent de la tâche partielle, puis les rollbacks des
+tâches terminées dans l'ordre inverse. INT et TERM empruntent le même chemin.
 
-Chaque script possède une responsabilité unique.
+`lib/state.sh` conserve la tâche et la phase courantes ainsi que la pile des
+tâches réussies dans `state/install.state`. Ce fichier sert au diagnostic : les
+tâches destructives ne sont jamais sautées automatiquement lors d'une reprise.
+`lib/progress.sh` affiche `[n/total]` et la durée. Les journaux horodatés sont
+placés sous `logs/`.
 
-## Une responsabilité par dossier
+## Ordre d'installation
 
-Les dossiers ne doivent pas mélanger plusieurs domaines.
+Environnement, sélection du disque, GPT, LUKS2, Btrfs, montages, pacstrap,
+configuration, paquets/services, utilisateur, Limine, TPM2/sécurité, cleanup et
+fin. Les opérations irréversibles exigent le mode réel et une confirmation sur
+le périphérique complet.
 
-## Idempotence
+## Desktop
 
-Tous les scripts doivent pouvoir être exécutés plusieurs fois sans provoquer d'effets indésirables.
-
-## Lisibilité
-
-Le projet privilégie toujours un code clair à une optimisation prématurée.
-
-## Documentation
-
-Toute décision importante doit être documentée avant d'être implémentée.
-
-## Exécution des commandes
-
-Les scripts ne doivent pas exécuter directement les commandes susceptibles de modifier le système.
-
-Ils doivent passer par une fonction commune chargée de :
-
-* journaliser la commande ;
-* gérer le mode simulation ;
-* détecter les erreurs ;
-* afficher un message compréhensible ;
-* interrompre l’installation en cas d’échec critique.
-
-Cette abstraction permet d’assurer un comportement homogène dans tous les modules.
-
----
-
-# Évolutions futures
-
-L'architecture doit permettre l'ajout de nouveaux modules sans modifier les composants existants.
-
-Exemples :
-
-- nouveau bureau
-- nouveau chargeur de démarrage
-- nouvelle méthode de chiffrement
-- nouvelles applications
-
-Les nouveaux modules doivent s'intégrer naturellement à l'organisation existante.
+Le bureau cible est Niri avec Dank Material Shell (`dms-shell-niri`). Les
+dotfiles restent dans un dépôt séparé et sont destinés à être appliqués avec
+GNU Stow après installation.

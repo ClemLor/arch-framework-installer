@@ -168,6 +168,39 @@ get_disk_physical_sector_size() {
     fi
 }
 
+get_disk_partition_count() {
+    lsblk --noheadings --paths --output TYPE "$1" 2>/dev/null |
+        awk '$1 == "part" { count++ } END { print count + 0 }'
+}
+
+get_partition_type_guid() {
+    lsblk --nodeps --noheadings --output PARTTYPE "$1" 2>/dev/null |
+        tr -d '[:space:]'
+}
+
+get_partition_label() {
+    lsblk --nodeps --noheadings --output PARTLABEL "$1" 2>/dev/null |
+        sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+get_partition_start_sector() {
+    lsblk --nodeps --noheadings --output START "$1" 2>/dev/null |
+        tr -d '[:space:]'
+}
+
+is_partition_mib_aligned() {
+    local partition="$1"
+    local parent
+    local start_sector
+    local logical_sector_size
+    parent="$(resolve_parent_disk "${partition}")" || return 1
+    start_sector="$(get_partition_start_sector "${partition}")"
+    logical_sector_size="$(get_disk_logical_sector_size "${parent}")"
+    [[ "${start_sector}" =~ ^[0-9]+$ ]] || return 1
+    [[ "${logical_sector_size}" =~ ^[0-9]+$ ]] || return 1
+    (( (start_sector * logical_sector_size) % 1048576 == 0 ))
+}
+
 get_disk_mounts() {
     local disk="$1"
 

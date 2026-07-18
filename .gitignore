@@ -29,6 +29,7 @@ venv/
 
 # Logs
 *.log
+state/*.state
 
 # Temporary files
 tmp/
