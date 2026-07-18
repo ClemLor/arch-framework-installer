@@ -18,9 +18,10 @@ l'architecture](docs/architecture.md), de la
 [configuration](docs/configuration.md), du [stockage](docs/storage.md) et de la
 [récupération](docs/recovery.md).
 
-Les tests n'utilisent que des mocks :
+Les tests unitaires n'utilisent que des mocks :
 
 ```bash
-bash tests/unit/test_task_engine.sh
-bash tests/unit/test_storage_task.sh
+for test_file in tests/unit/*.sh; do
+    bash "${test_file}"
+done
 ```

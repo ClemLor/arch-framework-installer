@@ -4,6 +4,8 @@ Les tests unitaires sont écrits en Bash sans framework externe. Ils remplacent
 les fonctions système par des mocks et ne manipulent jamais de périphérique
 physique. `test_task_engine.sh` couvre le cycle et le rollback ;
 `test_storage_task.sh` vérifie les barrières dry-run et confirmation.
+La CI découvre tous les fichiers `tests/unit/*.sh` afin qu'un nouveau test ne
+puisse pas être oublié dans une liste maintenue manuellement.
 
 ```bash
 find install.sh lib tasks tests -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n

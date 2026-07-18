@@ -20,16 +20,6 @@ jobs:
         run: find install.sh lib tasks tests -type f -name '*.sh' -print0 | xargs -0 shellcheck
       - name: Unit tests
         run: |
-          bash tests/unit/test_task_engine.sh
-          bash tests/unit/test_storage_task.sh
-          bash tests/unit/test_commands.sh
-          bash tests/unit/test_uefi_detection.sh
-          bash tests/unit/test_packages.sh
-          bash tests/unit/test_tpm_detection.sh
-          bash tests/unit/test_encryption_modes.sh
-          bash tests/unit/test_boot_modes.sh
-          bash tests/unit/test_desktop_session.sh
-          bash tests/unit/test_zram_configuration.sh
-          bash tests/unit/test_config_values.sh
-          bash tests/unit/test_user_configuration.sh
-          bash tests/unit/test_services.sh
+          for test_file in tests/unit/*.sh; do
+            bash "${test_file}"
+          done
