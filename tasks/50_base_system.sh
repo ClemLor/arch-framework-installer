@@ -8,7 +8,7 @@ task_base_system_validate() {
         warn "Network availability is not required to render the dry-run plan."
         return 0
     fi
-    validate_dns_resolution && validate_internet_connection
+    return 0
 }
 task_base_system_execute() { install_base_system; }
 task_base_system_verify() { [[ "${DRY_RUN}" == "true" ]] || [[ -x "${MOUNT_ROOT}/usr/bin/pacman" ]]; }

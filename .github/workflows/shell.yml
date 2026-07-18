@@ -24,3 +24,4 @@ jobs:
           bash tests/unit/test_storage_task.sh
           bash tests/unit/test_commands.sh
           bash tests/unit/test_uefi_detection.sh
+          bash tests/unit/test_packages.sh

@@ -1,0 +1,4 @@
+# Packages intentionally excluded from pacstrap.
+# Review their PKGBUILDs and install them as an unprivileged user after reboot.
+librewolf-bin
+microsoft-edge-stable-bin
