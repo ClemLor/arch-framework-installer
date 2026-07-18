@@ -1,5 +1,6 @@
 NetworkManager.service
 fstrim.timer
+fwupd-refresh.timer
 power-profiles-daemon.service
 snapper-cleanup.timer
 snapper-timeline.timer

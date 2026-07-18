@@ -91,6 +91,74 @@ validate_partition_label() {
     fi
 }
 
+validate_hostname() {
+    local label
+    local value="${HOSTNAME:-}"
+    local -a labels=()
+
+    if [[ ${#value} -gt 253 ]] ||
+        [[ ! "${value}" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] ||
+        [[ "${value}" == *..* ]]; then
+        error "HOSTNAME must be a valid DNS hostname."
+        return 1
+    fi
+
+    IFS='.' read -r -a labels <<<"${value}"
+    for label in "${labels[@]}"; do
+        if [[ ${#label} -gt 63 ]] || [[ ! "${label}" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
+            error "Each HOSTNAME label must be valid and 63 characters or fewer."
+            return 1
+        fi
+    done
+}
+
+validate_timezone() {
+    local zoneinfo_root="${ZONEINFO_ROOT:-/usr/share/zoneinfo}"
+
+    if [[ ! "${TIMEZONE:-}" =~ ^(UTC|[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)+)$ ]] ||
+        [[ ! -f "${zoneinfo_root}/${TIMEZONE:-}" ]]; then
+        error "TIMEZONE must name an existing zoneinfo file."
+        return 1
+    fi
+}
+
+validate_identity_configuration() {
+    local user_groups="${USER_GROUPS:-}"
+    local user_name="${USERNAME:-}"
+    local user_shell="${USER_SHELL:-}"
+
+    if [[ ! "${user_name}" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+        error "USERNAME is not a valid Linux account name."
+        return 1
+    fi
+
+    if [[ ! "${user_shell}" =~ ^/[A-Za-z0-9_./+-]+$ ]] || [[ "${user_shell}" == *..* ]]; then
+        error "USER_SHELL must be a safe absolute path."
+        return 1
+    fi
+
+    if [[ ! "${user_groups}" =~ ^[a-z_][a-z0-9_-]*(,[a-z_][a-z0-9_-]*)*$ ]]; then
+        error "USER_GROUPS must be a comma-separated list of valid group names."
+        return 1
+    fi
+}
+
+validate_locale_configuration() {
+    local value
+
+    for value in "${LOCALE:-}" "${SECONDARY_LOCALE:-}"; do
+        if [[ ! "${value}" =~ ^[A-Za-z][A-Za-z0-9_@.-]*$ ]]; then
+            error "LOCALE and SECONDARY_LOCALE contain an invalid value."
+            return 1
+        fi
+    done
+
+    if [[ ! "${KEYMAP:-}" =~ ^[A-Za-z0-9_-]+$ ]]; then
+        error "KEYMAP contains an invalid value."
+        return 1
+    fi
+}
+
 validate_btrfs_subvolumes() {
     if [[ -z "${BTRFS_SUBVOLUMES+x}" ]]; then
         error "Missing configuration array: BTRFS_SUBVOLUMES"
@@ -209,6 +277,22 @@ validate_config() {
             has_error="true"
         fi
     done
+
+    if ! validate_hostname; then
+        has_error="true"
+    fi
+
+    if ! validate_timezone; then
+        has_error="true"
+    fi
+
+    if ! validate_identity_configuration; then
+        has_error="true"
+    fi
+
+    if ! validate_locale_configuration; then
+        has_error="true"
+    fi
 
     if [[ "${TARGET_DISK}" != /dev/* ]]; then
         error "TARGET_DISK must be an absolute device path under /dev."

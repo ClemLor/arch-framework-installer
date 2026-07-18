@@ -16,6 +16,5 @@ NUMBER_LIMIT="50"
 NUMBER_LIMIT_IMPORTANT="10"
 ' || return 1
     write_target_file /etc/conf.d/snapper 'SNAPPER_CONFIGS="root"
-' || return 1
-    run_in_chroot systemctl enable snapper-timeline.timer snapper-cleanup.timer
+'
 }

@@ -7,7 +7,7 @@ task_security_validate() {
         require_commands_for_mode "TPM2" systemd-cryptenroll
     fi
 }
-task_security_execute() { enroll_luks_tpm2 && run_in_chroot systemctl enable fstrim.timer fwupd-refresh.timer; }
+task_security_execute() { enroll_luks_tpm2; }
 task_security_verify() {
     [[ "${DRY_RUN}" == "true" || "${TPM2_ENABLED}" != "true" ]] && return 0
     systemd-cryptenroll "$(luks_device)" | grep -q 'tpm2'

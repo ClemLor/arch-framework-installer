@@ -14,7 +14,8 @@ sudo ./install.sh --dry-run --verbose
 Une installation réelle exige aussi `ENABLE_REAL_INSTALLATION=true` dans une
 configuration explicitement revue. Le disque complet doit ensuite être saisi
 lors des confirmations destructives. Commencer par [la documentation de
-l'architecture](docs/architecture.md), du [stockage](docs/storage.md) et de la
+l'architecture](docs/architecture.md), de la
+[configuration](docs/configuration.md), du [stockage](docs/storage.md) et de la
 [récupération](docs/recovery.md).
 
 Les tests n'utilisent que des mocks :

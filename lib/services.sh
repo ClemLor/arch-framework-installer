@@ -16,3 +16,15 @@ configure_services() {
         run_in_chroot systemctl disable "${service}" || return 1
     done < <(sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "${root}/services/disable.list")
 }
+
+verify_enabled_services() {
+    local root
+    local service
+
+    [[ "${DRY_RUN:-false}" == "true" ]] && return 0
+    root="$(project_root)"
+    while IFS= read -r service; do
+        [[ -n "${service}" ]] || continue
+        run_in_chroot systemctl is-enabled --quiet "${service}" || return 1
+    done < <(sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "${root}/services/enable.list")
+}
