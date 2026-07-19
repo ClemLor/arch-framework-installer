@@ -8,7 +8,9 @@ task_users_execute() {
 }
 task_users_verify() {
     [[ "${DRY_RUN}" == "true" ]] || {
-        run_in_chroot id "${USERNAME}" >/dev/null && verify_user_desktop
+        run_in_chroot id "${USERNAME}" >/dev/null &&
+            verify_installed_user_home &&
+            verify_user_desktop
     }
 }
 task_users_cleanup() { return 0; }

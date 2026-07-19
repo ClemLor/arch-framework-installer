@@ -78,7 +78,7 @@ record_check() {
 
 require_validation_commands() {
     local command_name
-    for command_name in cmp cryptsetup findmnt grep id jq lsblk pacman pgrep swapon systemctl; do
+    for command_name in cmp cryptsetup findmnt grep id jq lsblk pacman pgrep runuser swapon systemctl; do
         command -v "${command_name}" >/dev/null || {
             printf 'Missing validation command: %s\n' "${command_name}" >&2
             return 1
@@ -153,8 +153,19 @@ validate_zram_profile() {
 
 validate_user_desktop() {
     local wants_path="/home/${TARGET_USERNAME}/.config/systemd/user/niri.service.wants"
+    local path
 
     id "${TARGET_USERNAME}" >/dev/null || return 1
+    for path in \
+        "/home/${TARGET_USERNAME}" \
+        "/home/${TARGET_USERNAME}/.cache" \
+        "/home/${TARGET_USERNAME}/.config" \
+        "/home/${TARGET_USERNAME}/.config/systemd/user" \
+        "/home/${TARGET_USERNAME}/.local" \
+        "/home/${TARGET_USERNAME}/.local/bin" \
+        "/home/${TARGET_USERNAME}/.local/share"; do
+        runuser --user "${TARGET_USERNAME}" -- test -w "${path}" || return 1
+    done
     [[ -L "${wants_path}/dms.service" ]] || return 1
     [[ -L "${wants_path}/dms-lock-on-start.service" ]] || return 1
     pgrep --uid "${TARGET_USERNAME}" --exact niri >/dev/null || return 1
