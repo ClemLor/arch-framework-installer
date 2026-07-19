@@ -78,7 +78,10 @@ record_check() {
 
 require_validation_commands() {
     local command_name
-    for command_name in cmp cryptsetup find findmnt grep id jq lsblk niri pacman pgrep runuser swapon systemctl; do
+    # Only list tools required to run the validator itself. Desktop programs
+    # such as niri are part of the installation under test and must produce a
+    # failed check without aborting the remaining diagnostics.
+    for command_name in cmp cryptsetup find findmnt grep id jq lsblk pacman pgrep runuser swapon systemctl; do
         command -v "${command_name}" >/dev/null || {
             printf 'Missing validation command: %s\n' "${command_name}" >&2
             return 1
@@ -163,6 +166,7 @@ validate_user_desktop() {
     local path
 
     id "${TARGET_USERNAME}" >/dev/null || return 1
+    command -v niri >/dev/null || return 1
     for path in \
         "/home/${TARGET_USERNAME}" \
         "/home/${TARGET_USERNAME}/.cache" \

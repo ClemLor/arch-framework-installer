@@ -39,3 +39,8 @@ graphics_render_node_available
 find() { return 0; }
 ! graphics_render_node_available
 printf '%s\n' 'ok - VM validation detects a missing DRM render node'
+
+VALIDATOR_SOURCE="$(<"${ROOT}/tests/vm/validate_installation.sh")"
+[[ "${VALIDATOR_SOURCE}" != *'lsblk niri pacman'* ]]
+[[ "${VALIDATOR_SOURCE}" == *'command -v niri'* ]]
+printf '%s\n' 'ok - a missing Niri installation fails one check without aborting validation'

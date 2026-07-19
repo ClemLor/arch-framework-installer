@@ -40,6 +40,11 @@ Niri/DMS, puis zram. Les profils attendus sont fournis
 explicitement en arguments afin que le test ne valide pas simplement l'état
 qu'il découvre.
 
+Les programmes du système testé, notamment `niri`, ne sont pas des dépendances
+du validateur. S'ils manquent, les contrôles des paquets et de la session
+échouent, mais les autres diagnostics continuent afin de produire un rapport
+complet.
+
 Le test de readiness reproduit la syntaxe `subvol=/@` émise par `genfstab` et
 vérifie aussi le profil historique `subvol=@`. Les autres sous-volumes ne sont
 jamais acceptés comme racine.
