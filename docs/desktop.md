@@ -45,3 +45,17 @@ Niri a besoin d'un nœud de rendu DRM. Dans GNOME Boxes, l'accélération 3D doi
 pas ce périphérique. Le validateur post-installation signale explicitement
 l'absence de `/dev/dri/renderD*`. Les erreurs de portail GTK ou l'avertissement
 `import-environment` ne prouvent pas à eux seuls une panne du compositeur.
+
+## Fonds d'écran et couleurs dynamiques
+
+Les images ne sont pas stockées dans l'installateur. Le dépôt de dotfiles
+configure le gestionnaire de fonds d'écran intégré à DMS et synchronise un
+dépôt Git `wallpapers` séparé dans le répertoire de données utilisateur. À
+chaque sélection ou rotation, Matugen extrait la palette principale et génère
+les thèmes pris en charge pour Niri, GTK, Qt, Ghostty, KDE, VS Code et les
+navigateurs détectés.
+
+L'état DMS contenant le chemin absolu du fond d'écran reste local et n'est
+jamais suivi par Git. Chaque image destinée à être publiée doit disposer d'une
+licence de redistribution et être débarrassée de ses métadonnées EXIF, XMP,
+IPTC et GPS.

@@ -1,4 +1,6 @@
 git
+github-cli
+perl-image-exiftool
 shellcheck
 stow
 code

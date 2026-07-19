@@ -10,6 +10,12 @@ ajoute `intel-media-driver` et `vulkan-intel` pour l'accélération graphique de
 GPU Intel modernes. `mesa` reste fourni par les dépendances officielles de
 Niri.
 
+`qt5ct` et `qt6ct` permettent aux palettes Matugen générées par DMS d'atteindre
+les applications Qt. `github-cli` facilite la restauration des dépôts privés de
+dotfiles et de fonds d'écran sans manipuler de jeton dans un script.
+`perl-image-exiftool` contrôle les métadonnées des images avant leur ajout au
+dépôt de fonds d'écran.
+
 Avant toute écriture disque, l'installateur rafraîchit les bases pacman et
 vérifie avec `pacman --sync --info` que chaque paquet destiné à `pacstrap` est
 disponible. Une faute de nom arrête donc l'installation avant le partitionnement.

@@ -16,8 +16,8 @@ else
     exit 1
 fi
 
-for package in cava cups-pk-helper dms-shell-niri intel-media-driver \
-    kimageformats matugen niri vulkan-intel; do
+for package in cava cups-pk-helper dms-shell-niri github-cli intel-media-driver \
+    kimageformats matugen niri perl-image-exiftool qt5ct qt6ct vulkan-intel; do
     if ! collect_packages | grep -Fxq "${package}"; then
         printf 'not ok - required Niri/DMS package is missing: %s\n' "${package}" >&2
         exit 1
