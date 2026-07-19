@@ -16,6 +16,15 @@ else
     exit 1
 fi
 
+for package in cava cups-pk-helper dms-shell-niri intel-media-driver \
+    kimageformats matugen niri vulkan-intel; do
+    if ! collect_packages | grep -Fxq "${package}"; then
+        printf 'not ok - required Niri/DMS package is missing: %s\n' "${package}" >&2
+        exit 1
+    fi
+done
+printf '%s\n' 'ok - Niri, DMS and Framework graphics packages are included'
+
 collect_packages() { printf '%s\n' base unavailable-package; }
 pacman() {
     [[ "${*: -1}" != "unavailable-package" ]]

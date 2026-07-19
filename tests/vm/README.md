@@ -21,8 +21,10 @@ La matrice minimale à valider avant le matériel réel est :
 
 Pour chaque profil, vérifier aussi les entrées Limine `linux-lts` et `linux`,
 une déconnexion suivie du greeter DMS, puis un nouveau démarrage. Le script
-échoue si UEFI, Btrfs, `/boot`, Limine, les services, Niri/DMS, le profil de
-sécurité ou zram ne correspondent pas aux options annoncées.
+échoue si UEFI, Btrfs, `/boot`, Limine, les services, le nœud de rendu DRM, la
+configuration ou la session Niri/DMS, le profil de sécurité ou zram ne
+correspondent pas aux options annoncées. L'absence de `/dev/dri/renderD*`
+indique généralement que l'accélération 3D de la VM n'est pas exposée.
 
 Le script ne partitionne et ne formate aucun périphérique. Les tests de stockage
 réel restent réservés à une VM jetable ou à un loop device explicitement isolé.

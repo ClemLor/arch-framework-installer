@@ -1,3 +1,5 @@
 fprintd
 iio-sensor-proxy
+intel-media-driver
 power-profiles-daemon
+vulkan-intel

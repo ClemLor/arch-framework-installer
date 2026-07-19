@@ -35,7 +35,8 @@ manuellement sur le Framework après sauvegarde vérifiée.
 
 Après le redémarrage de la VM, `tests/vm/validate_installation.sh` vérifie en
 lecture seule le montage Btrfs, Limine, le profil LUKS2/TPM2, les paquets et
-services, la session Niri/DMS et zram. Les profils attendus sont fournis
+services, la présence d'un nœud de rendu DRM, la configuration et la session
+Niri/DMS, puis zram. Les profils attendus sont fournis
 explicitement en arguments afin que le test ne valide pas simplement l'état
 qu'il découvre.
 

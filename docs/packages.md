@@ -3,7 +3,12 @@
 Les fichiers `packages/*.list` sont lus par `lib/pacstraps.sh`, nettoyés de leurs
 commentaires, fusionnés et triés avant un unique appel à `pacstrap`. Les groupes
 sont base, firmware, Framework, desktop, développement, fontes, multimédia et
-optionnels. Le profil desktop officiel contient `niri` et `dms-shell-niri`.
+optionnels. Le profil desktop contient `niri`, `dms-shell-niri`, ainsi que
+`matugen`, `cava`, `kimageformats` et `cups-pk-helper`, utilisés par les modules
+de thème, visualisation audio, images et impression de DMS. Le profil Framework
+ajoute `intel-media-driver` et `vulkan-intel` pour l'accélération graphique des
+GPU Intel modernes. `mesa` reste fourni par les dépendances officielles de
+Niri.
 
 Avant toute écriture disque, l'installateur rafraîchit les bases pacman et
 vérifie avec `pacman --sync --info` que chaque paquet destiné à `pacstrap` est

@@ -32,3 +32,10 @@ record_check success true >/dev/null
 record_check failure false >/dev/null 2>&1
 [[ "${FAILURES}" -eq 1 ]]
 printf '%s\n' 'ok - VM validation aggregates failed checks'
+
+find() { printf '/dev/dri/renderD128\n'; }
+grep() { command grep "$@"; }
+graphics_render_node_available
+find() { return 0; }
+! graphics_render_node_available
+printf '%s\n' 'ok - VM validation detects a missing DRM render node'

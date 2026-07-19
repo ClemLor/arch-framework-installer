@@ -78,12 +78,17 @@ record_check() {
 
 require_validation_commands() {
     local command_name
-    for command_name in cmp cryptsetup findmnt grep id jq lsblk pacman pgrep runuser swapon systemctl; do
+    for command_name in cmp cryptsetup find findmnt grep id jq lsblk niri pacman pgrep runuser swapon systemctl; do
         command -v "${command_name}" >/dev/null || {
             printf 'Missing validation command: %s\n' "${command_name}" >&2
             return 1
         }
     done
+}
+
+graphics_render_node_available() {
+    find /dev/dri -maxdepth 1 -type c -name 'renderD*' -print -quit 2>/dev/null |
+        grep -q .
 }
 
 root_mount_is_expected_btrfs() {
@@ -152,6 +157,8 @@ validate_zram_profile() {
 }
 
 validate_user_desktop() {
+    local niri_config="/home/${TARGET_USERNAME}/.config/niri/config.kdl"
+    local niri_dropin="/home/${TARGET_USERNAME}/.config/systemd/user/niri.service.d/dms.conf"
     local wants_path="/home/${TARGET_USERNAME}/.config/systemd/user/niri.service.wants"
     local path
 
@@ -166,7 +173,9 @@ validate_user_desktop() {
         "/home/${TARGET_USERNAME}/.local/share"; do
         runuser --user "${TARGET_USERNAME}" -- test -w "${path}" || return 1
     done
-    [[ -L "${wants_path}/dms.service" ]] || return 1
+    [[ -s "${niri_config}" ]] || return 1
+    [[ -s "${niri_dropin}" ]] || return 1
+    runuser --user "${TARGET_USERNAME}" -- niri validate --config "${niri_config}" || return 1
     [[ -L "${wants_path}/dms-lock-on-start.service" ]] || return 1
     pgrep --uid "${TARGET_USERNAME}" --exact niri >/dev/null || return 1
     systemctl --user --machine="${TARGET_USERNAME}@.host" is-active --quiet dms.service
@@ -202,6 +211,7 @@ main() {
     record_check "Limine EFI, kernels and initramfs are intact" limine_artifacts_match
     record_check "storage encryption and TPM2 match the selected profile" validate_storage_security_profile
     record_check "required desktop and recovery packages are installed" validate_packages
+    record_check "a DRM render node is available to Niri" graphics_render_node_available
     record_check "system services and graphical target are ready" validate_services
     record_check "the configured user has an active Niri/DMS session" validate_user_desktop
     record_check "zram matches the selected profile" validate_zram_profile
