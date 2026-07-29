@@ -8,6 +8,11 @@ state, it is still listed — greyed out, with the reason. The alternative, hidi
 it, leaves the user wondering where the option went; the other alternative,
 accepting it and failing later in ``validate_config``, wastes their time and
 teaches them nothing.
+
+This module decides what is asked; :mod:`configurator.prompts` decides how, and
+:mod:`configurator.tui` is one of the answers. Nothing here may import the
+front-end — the dependency runs one way only, or the editors below stop being
+the single place the constraint logic lives.
 """
 
 from __future__ import annotations
@@ -17,7 +22,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
-from . import catalogue, constraints
+from . import catalogue, constraints, prompts
 from .config import Configuration, Size
 from .devices import enumerate_disks
 
@@ -63,44 +68,48 @@ class Menu:
 
             problem = violations.get(entry.key)
             if problem is not None:
-                tag = "BLOCKED" if problem.blocking else "note"
-                line += f"\n         {tag}: {problem.message}"
+                line += f"\n         {tag(problem)}: {problem.message}"
             lines.append(line)
         return lines
+
+
+def tag(violation: constraints.Violation) -> str:
+    """How a violation is introduced to the user.
+
+    One function so both front-ends use the same two words; the documentation
+    quotes them, and a menu that said BLOCKED where the other said blocking
+    would make the two look like different programs.
+    """
+    return "BLOCKED" if violation.blocking else "note"
+
+
+def unanswered(menu: "Menu", config: Configuration) -> list[str]:
+    """Mandatory entries still showing no value."""
+    return [
+        entry.label
+        for entry in menu.entries
+        if entry.mandatory and entry.preview(config) == NOT_SET
+    ]
 
 
 # ------------------------------------------------------------------------------
 # Prompts
 # ------------------------------------------------------------------------------
+#
+# Thin delegators to whichever backend is installed. The signatures are what the
+# editors below and the tests call, and they stay as they are; the bodies moved
+# to prompts.TextPrompts so a curses front-end can answer the same four
+# questions without a second copy of the eleven editors.
 
-
-def _read(prompt: str) -> str:
-    answer = input(prompt)
-    if answer.strip().lower() in {":q", ":quit"}:
-        raise _Abandoned
-    return answer
-
-
-class _Abandoned(Exception):
-    """The user left a prompt without answering."""
+_Abandoned = prompts.Abandoned
 
 
 def ask_text(label: str, current: str) -> str:
-    answer = _read(f"{label} [{current}]: ").strip()
-    return answer or current
+    return prompts.current().text(label, current)
 
 
 def ask_bool(label: str, current: bool) -> bool:
-    default = "Y/n" if current else "y/N"
-    while True:
-        answer = _read(f"{label} [{default}]: ").strip().lower()
-        if not answer:
-            return current
-        if answer in {"y", "yes"}:
-            return True
-        if answer in {"n", "no"}:
-            return False
-        print("  Answer y or n.")
+    return prompts.current().boolean(label, current)
 
 
 def ask_checkboxes(
@@ -110,68 +119,9 @@ def ask_checkboxes(
     *,
     locked_on: list[object] = (),
 ) -> list[object]:
-    """Toggle any number of options, archinstall-style.
-
-    Each option is ``(value, description, unavailable_reason)``. ``locked_on``
-    values are always selected and cannot be turned off — used for the package
-    groups the machine would not boot without, which are better shown as
-    permanently ticked than hidden.
-    """
-    chosen = {
-        value for value, _, reason in options if value in selected and not reason
-    }
-    chosen.update(locked_on)
-
-    print(f"\n{label}")
-    while True:
-        for number, (value, description, reason) in enumerate(options, start=1):
-            if reason:
-                mark = "-"
-            elif value in chosen:
-                mark = "x"
-            else:
-                mark = " "
-
-            suffix = ""
-            if value in locked_on:
-                suffix = "  (always installed)"
-            print(f"  {number:>2}) [{mark}] {description}{suffix}")
-            if reason:
-                print(f"          unavailable: {reason}")
-
-        print("   a) select all    n) select none    Enter) accept")
-        answer = _read("Toggle: ").strip().lower()
-
-        if not answer:
-            return [value for value, _, _ in options if value in chosen]
-
-        if answer == "a":
-            chosen = {
-                value for value, _, reason in options if not reason
-            } | set(locked_on)
-            continue
-        if answer == "n":
-            chosen = set(locked_on)
-            continue
-
-        if not answer.isdigit():
-            print("  Enter a number, a, n, or Enter.")
-            continue
-
-        index = int(answer) - 1
-        if index not in range(len(options)):
-            print("  Out of range.")
-            continue
-
-        value, description, reason = options[index]
-        if reason:
-            print(f"  Not available: {reason}")
-            continue
-        if value in locked_on:
-            print(f"  {description} cannot be removed.")
-            continue
-
-        chosen.symmetric_difference_update({value})
+    return prompts.current().checkboxes(
+        label, options, selected, locked_on=locked_on
+    )
 
 
 def ask_locked_choice(
@@ -179,38 +129,7 @@ def ask_locked_choice(
     options: list[tuple[object, str, str | None]],
     current: object,
 ) -> object:
-    """Choose from options, some of which may be locked.
-
-    Each option is ``(value, description, lock_reason)``. A locked option is
-    shown and refuses selection with its reason, rather than being hidden.
-    """
-    print(f"\n{label}")
-    for number, (value, description, lock) in enumerate(options, start=1):
-        mark = "x" if value == current else " "
-        if lock:
-            print(f"  {number:>2}) [-] {description}")
-            print(f"          locked: {lock}")
-        else:
-            print(f"  {number:>2}) [{mark}] {description}")
-
-    while True:
-        answer = _read("Choose (Enter to keep): ").strip()
-        if not answer:
-            return current
-        if not answer.isdigit():
-            print("  Enter a number.")
-            continue
-
-        index = int(answer) - 1
-        if index not in range(len(options)):
-            print("  Out of range.")
-            continue
-
-        value, _, lock = options[index]
-        if lock:
-            print(f"  Not available: {lock}")
-            continue
-        return value
+    return prompts.current().choice(label, options, current)
 
 
 # ------------------------------------------------------------------------------
@@ -641,17 +560,13 @@ def run(menu: Menu, config: Configuration) -> Action:
             print(line)
 
         problems = constraints.blocking(config)
-        unanswered = [
-            entry.label
-            for entry in menu.entries
-            if entry.mandatory and entry.preview(config) == NOT_SET
-        ]
+        missing = unanswered(menu, config)
 
         print()
         if problems:
             print(f"  {len(problems)} blocking problem(s) above.")
-        if unanswered:
-            print(f"  Unanswered and required: {', '.join(unanswered)}")
+        if missing:
+            print(f"  Unanswered and required: {', '.join(missing)}")
         print("\n   s) Save    i) Install    q) Quit      * = required\n")
 
         try:
@@ -664,7 +579,7 @@ def run(menu: Menu, config: Configuration) -> Action:
         if choice in {"s", "save"}:
             return Action.SAVE
         if choice in {"i", "install"}:
-            if problems or unanswered:
+            if problems or missing:
                 print("\nCannot install until the problems above are resolved.\n")
                 continue
             return Action.INSTALL
