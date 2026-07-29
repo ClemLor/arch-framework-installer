@@ -81,8 +81,17 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def load_or_default(path: Path | None) -> InstallConfig:
+def load_or_default(path: Path | None, *, missing_is_ok: bool = False) -> InstallConfig:
+    """Load a configuration, or start from the profile defaults.
+
+    ``missing_is_ok`` is for the guided menu, where ``--config`` names both what
+    to load and where to save: a path that does not exist yet is the normal
+    first-run case, not an error.
+    """
     if path is None:
+        return default_config()
+    if missing_is_ok and not path.exists():
+        log.info(f"{path} does not exist yet; starting from the Framework defaults.")
         return default_config()
     return InstallConfig.load(path)
 
@@ -180,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     try:
-        config = load_or_default(args.config)
+        config = load_or_default(args.config, missing_is_ok=args.tui)
 
         if args.inspect:
             return inspect(config)
@@ -190,8 +199,14 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
         if args.tui:
-            log.error("--tui is not implemented yet; phase 3.")
-            return 2
+            from .scripts import guided
+
+            return guided.run(
+                config,
+                config_path=args.config or DEFAULT_CONFIG_PATH,
+                renderer_name=args.renderer,
+                from_saved=args.config is not None and args.config.exists(),
+            )
 
         log.error("No mode selected. Try --tui, --inspect or --help.")
         return 2

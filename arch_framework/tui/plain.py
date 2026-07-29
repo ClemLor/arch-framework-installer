@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from .menu import Action, MenuRegistry
+from .prompt import Abandoned
 
 
 class PlainRenderer:
@@ -46,7 +47,14 @@ class PlainRenderer:
 
             if entry.help_text:
                 print(f"\n{entry.help_text}")
-            entry.edit(config)
+
+            try:
+                entry.edit(config)
+            except Abandoned:
+                print("\nLeft unchanged.\n")
+            except ValueError as exc:
+                # A rejected edit must not end the session or half-apply.
+                print(f"\nRejected: {exc}\n")
 
     def _resolve(self, choice: str):
         if choice.isdigit():

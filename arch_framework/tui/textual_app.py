@@ -21,6 +21,7 @@ from textual.containers import Vertical
 from textual.widgets import Footer, Header, ListItem, ListView, Static
 
 from .menu import Action, MenuEntry, MenuRegistry
+from .prompt import Abandoned
 
 
 class MenuApp(App[Action]):
@@ -42,6 +43,9 @@ class MenuApp(App[Action]):
         super().__init__()
         self.registry = registry
         self.config = config
+        #: Last refusal shown to the user. Kept on the app rather than read back
+        #: out of the widget, so tests do not depend on Textual internals.
+        self.last_error: str = ""
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -77,6 +81,7 @@ class MenuApp(App[Action]):
         return self.registry.entries[view.index]
 
     def _error(self, message: str) -> None:
+        self.last_error = message
         self.query_one("#error", Static).update(message)
 
     # -- actions ------------------------------------------------------------
@@ -95,11 +100,14 @@ class MenuApp(App[Action]):
                 print(f"{entry.help_text}\n")
             try:
                 entry.edit(self.config)
-            except (KeyboardInterrupt, EOFError):
-                print("\nCancelled.")
+            except (Abandoned, KeyboardInterrupt, EOFError):
+                print("\nLeft unchanged.")
             except ValueError as exc:
                 print(f"\nRejected: {exc}")
-                input("Press Enter to continue...")
+                try:
+                    input("Press Enter to continue...")
+                except (KeyboardInterrupt, EOFError):
+                    pass
 
         self._refresh_entries()
 

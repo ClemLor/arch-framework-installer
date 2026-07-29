@@ -69,11 +69,16 @@ class MenuRegistry:
         ]
 
     def render_lines(self, config: Any) -> list[str]:
-        """Aligned ``label ... value`` lines, with mandatory entries marked."""
-        width = max((len(entry.label) for entry in self.entries), default=0) + 2
+        """Aligned ``label ... value`` lines, with mandatory entries marked.
+
+        The marker sits in its own leading column so the labels stay flush; a
+        marker appended to the label would push every mandatory row out of line
+        with the others.
+        """
+        width = max((len(entry.label) for entry in self.entries), default=0)
         lines: list[str] = []
         for entry in self.entries:
-            marker = " *" if entry.mandatory else "  "
-            label = f"{entry.label}{marker}".ljust(width + 2, ".")
-            lines.append(f"{label} {entry.preview(config)}")
+            marker = "*" if entry.mandatory else " "
+            label = f"{entry.label} ".ljust(width + 2, ".")
+            lines.append(f"{marker} {label} {entry.preview(config)}")
         return lines

@@ -15,6 +15,24 @@ class Bootloader(StrEnum):
 
     @property
     def packages(self) -> tuple[str, ...]:
+        """Packages installable during pacstrap, from the official repositories."""
         match self:
             case Bootloader.LIMINE:
-                return ("limine", "limine-mkinitcpio-hook")
+                return ("limine",)
+
+    @property
+    def aur_packages(self) -> tuple[str, ...]:
+        """Packages that exist only in the AUR.
+
+        These cannot be installed during pacstrap: the AUR needs a helper and a
+        build environment, neither of which exists in the live ISO. They are a
+        post-first-boot step, and the installation must be able to boot without
+        them.
+
+        ``limine-mkinitcpio-hook`` automates regenerating boot entries when a
+        kernel is installed or removed. Without it, ``limine.conf`` is written
+        once by the installer and has to be maintained by hand.
+        """
+        match self:
+            case Bootloader.LIMINE:
+                return ("limine-mkinitcpio-hook",)
