@@ -11,7 +11,15 @@ USER_SHELL="/usr/bin/fish"
 DRY_RUN="true"
 CALLS=''
 
-run_in_chroot() { CALLS+="chroot:$*\n"; }
+# P means root already has a usable password, so set_root_password leaves it
+# alone. The locked case is covered in test_user_privileges.sh.
+ROOT_STATUS="root P 07/29/2026 0 99999 7 -1"
+
+run_in_chroot() {
+    CALLS+="chroot:$*\n"
+    [[ "$*" == *"passwd --status root"* ]] && printf '%s\n' "${ROOT_STATUS}"
+    return 0
+}
 run_command() { CALLS+="command:$*\n"; }
 write_target_file() { CALLS+="write:$1:$2\n"; }
 info() { :; }
@@ -29,11 +37,16 @@ create_installed_user
 [[ "${CALLS}" == *'command:chmod 0440 /target/etc/sudoers.d/10-wheel'* ]]
 printf '%s\n' 'ok - dry-run renders user creation and password setup'
 
+# Both passwords are prompted, and neither is ever written to a file.
+[[ "${CALLS}" == *'command:arch-chroot /target passwd root'* ]]
+[[ "${CALLS}" != *'write:'*'passwd'* ]]
+printf '%s\n' 'ok - dry-run renders the root password prompt'
+
 DRY_RUN="false"
 CALLS=''
 run_in_chroot() {
     CALLS+="chroot:$*\n"
-    [[ "$1" == "id" ]] && return 0
+    [[ "$*" == *"passwd --status root"* ]] && printf '%s\n' "${ROOT_STATUS}"
     return 0
 }
 create_installed_user
@@ -43,6 +56,14 @@ create_installed_user
 [[ "${CALLS}" == *'chroot:chown alice:alice /home/alice'* ]]
 [[ "${CALLS}" == *'chroot:visudo -cf /etc/sudoers.d/10-wheel'* ]]
 printf '%s\n' 'ok - an existing account is updated without resetting its password'
+
+# Re-running an installation must not prompt for a root password that exists.
+#
+# The status lookup itself is invisible here: it runs inside a command
+# substitution, so its own bookkeeping happens in a subshell. What is observable
+# is that no password was set, which is the property that matters.
+[[ "${CALLS}" != *'passwd root'* ]]
+printf '%s\n' 'ok - an existing root password is not reset either'
 
 CALLS=''
 run_in_chroot() {

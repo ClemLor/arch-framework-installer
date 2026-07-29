@@ -19,6 +19,51 @@ prepare_installed_user_home() {
         "${home_path}/.local/bin"
 }
 
+# Whether root has a usable password.
+#
+# `passwd --status` reports P for a usable password, L for locked and NP for none.
+# A fresh pacstrap leaves root locked, so this distinguishes "already set" from
+# "never set" and keeps the prompt out of a re-run.
+root_password_is_set() {
+    local status
+
+    status="$(run_in_chroot passwd --status root)" || return 1
+    [[ "$(awk '{ print $2 }' <<<"${status}")" == "P" ]]
+}
+
+# The fallback when sudo is unavailable.
+#
+# Asked interactively, exactly like the user's password, and never stored in the
+# configuration. It exists so that a mistake in group membership, a broken
+# sudoers file or a damaged user account is recoverable from a TTY instead of
+# requiring a reinstall.
+set_root_password() {
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        run_command arch-chroot "${MOUNT_ROOT}" passwd root
+        return 0
+    fi
+
+    if root_password_is_set; then
+        info "root already has a password; leaving it unchanged."
+        return 0
+    fi
+
+    info "Set the root password. This is the way back in if sudo ever fails."
+    log_message "COMMAND" "interactive: arch-chroot ${MOUNT_ROOT} passwd root"
+    arch-chroot "${MOUNT_ROOT}" passwd root
+}
+
+# A locked root account plus any fault in the sudo path leaves no way in at all,
+# which on an encrypted disk means reinstalling.
+verify_root_password() {
+    [[ "${DRY_RUN:-false}" == "true" ]] && return 0
+
+    if ! root_password_is_set; then
+        error "root has no usable password; there would be no fallback if sudo failed."
+        return 1
+    fi
+}
+
 # Membership is checked separately from the sudoers file.
 #
 # The file granting %wheel and the account being in wheel are two independent
@@ -89,6 +134,7 @@ create_installed_user() {
         arch-chroot "${MOUNT_ROOT}" passwd "${USERNAME}" || return 1
     fi
     prepare_installed_user_home || return 1
+    set_root_password || return 1
     write_target_file /etc/sudoers.d/10-wheel '%wheel ALL=(ALL:ALL) ALL
 ' || return 1
     run_command chmod 0440 "${MOUNT_ROOT}/etc/sudoers.d/10-wheel" || return 1

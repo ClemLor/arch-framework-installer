@@ -2,27 +2,38 @@
 
 ## Accès administrateur
 
-L'installateur **ne définit jamais de mot de passe root**. Après `pacstrap`, le
-compte root reste verrouillé : aucune connexion root n'est possible.
+Deux chemins, dans cet ordre d'usage :
 
-`sudo` via le groupe `wheel` est donc le **seul** accès administrateur de la
-machine.
+1. **`sudo` via le groupe `wheel`** — l'accès quotidien.
+2. **Mot de passe root** — le recours, utilisable depuis un TTY.
+
+Les deux mots de passe sont demandés **interactivement pendant l'installation**,
+comme celui de l'utilisateur, et ne sont jamais écrits dans la configuration.
+
+Le mot de passe root existe précisément pour le cas décrit ci-dessous : une erreur
+d'appartenance de groupe, un fichier `sudoers` cassé ou un compte utilisateur
+endommagé se répare depuis un TTY au lieu d'exiger une réinstallation. Sur un
+disque chiffré, la différence est celle entre corriger une ligne et repartir de
+zéro.
+
+Une réinstallation ne redemande pas un mot de passe root déjà défini.
 
 | Élément | Où |
 | --- | --- |
 | Paquet `sudo` | `packages/base.list` |
 | `%wheel ALL=(ALL:ALL) ALL` | `/etc/sudoers.d/10-wheel`, mode `0440` |
 | Appartenance au groupe | `USER_GROUPS` doit contenir `wheel` |
+| Mot de passe root | demandé à l'installation, vérifié via `passwd --status` |
 
 Un fichier `sudoers` accordant `%wheel` et un compte appartenant à `wheel` sont
 deux faits **indépendants**. Chacun paraît correct isolément, et seuls les deux
 ensemble accordent quelque chose.
 
-Une configuration où `USER_GROUPS` omet `wheel` produisait donc une machine que
-personne ne pouvait administrer, alors que chaque vérification passait :
-format valide, groupes réels, `useradd` réussi, fichier `sudoers` écrit et validé
-par `visudo`. Le résultat était irrécupérable sans réinstaller, et
-`afi-aur-setup` échouait au premier démarrage.
+Une configuration où `USER_GROUPS` omet `wheel` produisait donc un compte sans
+aucun `sudo`, alors que chaque vérification passait : format valide, groupes
+réels, `useradd` réussi, fichier `sudoers` écrit et validé par `visudo`. Avant
+l'ajout du mot de passe root, le résultat était irrécupérable sans réinstaller.
+`afi-aur-setup` refuse toujours de fonctionner dans cet état.
 
 Trois contrôles couvrent désormais ce cas :
 
@@ -36,8 +47,9 @@ Trois contrôles couvrent désormais ce cas :
 
 La correspondance est exacte : un groupe nommé `wheelless` ne compte pas.
 
-Un mot de passe est demandé interactivement pour le compte utilisateur pendant
-l'installation. Il n'est jamais stocké dans la configuration.
+La vérification finale contrôle également que root possède un mot de passe
+utilisable (`P` dans `passwd --status`, par opposition à `L` verrouillé ou `NP`
+absent, qui est l'état laissé par `pacstrap`).
 
 ---
 

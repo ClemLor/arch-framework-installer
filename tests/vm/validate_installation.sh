@@ -290,6 +290,14 @@ validate_user_privileges() {
     [[ -s /etc/sudoers.d/10-wheel ]] || return 1
     visudo -cf /etc/sudoers.d/10-wheel >/dev/null || return 1
 
+    # The fallback. Without it, any fault in the sudo path leaves no way in at
+    # all, which on an encrypted disk means reinstalling. P means a usable
+    # password; L is locked and NP is none.
+    [[ "$(passwd --status root | awk '{ print $2 }')" == "P" ]] || {
+        printf 'root has no usable password; there is no fallback if sudo breaks.\n' >&2
+        return 1
+    }
+
     # Asks sudo what it actually grants, rather than trusting a valid file.
     sudo --list --user "${TARGET_USERNAME}" >/dev/null || {
         printf 'sudo grants %s nothing.\n' "${TARGET_USERNAME}" >&2

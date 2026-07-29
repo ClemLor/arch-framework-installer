@@ -157,16 +157,16 @@ validate_identity_configuration() {
         return 1
     fi
 
-    # The installer never sets a root password, so root stays locked and sudo is
-    # the only administrative access the machine has. The sudoers drop-in grants
-    # %wheel; an account outside wheel therefore cannot administer the system at
-    # all — and every individual piece still looks correct, which is why this is
-    # checked rather than assumed.
+    # The sudoers drop-in grants %wheel, so an account outside wheel has no sudo
+    # at all. A root password is also set, so this is recoverable rather than
+    # fatal — but only from a TTY as root, and afi-aur-setup would still refuse to
+    # run after the first boot. Every individual piece looks correct in that
+    # state, which is why membership is required rather than assumed.
     if [[ ",${user_groups}," != *,wheel,* ]]; then
         error "USER_GROUPS must include 'wheel'."
-        error "Root has no password, so sudo through wheel is the only way to"
-        error "administer the installed system. Without it the result is"
-        error "unadministrable, including for afi-aur-setup after the first boot."
+        error "The sudoers policy grants %wheel, so an account outside it has no"
+        error "sudo. The root password would be the only way in, and"
+        error "afi-aur-setup refuses to run without sudo."
         return 1
     fi
 }

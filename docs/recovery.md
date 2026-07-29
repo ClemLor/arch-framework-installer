@@ -15,6 +15,36 @@ automatique ne prétend restaurer les anciennes données.
 
 ---
 
+## `sudo` ne fonctionne plus
+
+Le cas typique : compte retiré de `wheel`, fichier `sudoers` cassé par une
+édition, ou `/etc/sudoers.d/10-wheel` supprimé.
+
+Le mot de passe root défini à l'installation existe pour cela. Depuis un TTY
+(`Ctrl+Alt+F2`) :
+
+```bash
+# login: root
+usermod --append --groups wheel <utilisateur>
+visudo -cf /etc/sudoers.d/10-wheel
+```
+
+Si le fichier a disparu :
+
+```bash
+printf '%%wheel ALL=(ALL:ALL) ALL\n' > /etc/sudoers.d/10-wheel
+chmod 0440 /etc/sudoers.d/10-wheel
+visudo -cf /etc/sudoers.d/10-wheel
+```
+
+Il faut se reconnecter pour que la nouvelle appartenance de groupe prenne effet.
+
+Sans ce mot de passe root, la même situation imposerait une réinstallation : sur
+un disque chiffré, il n'existe aucun autre moyen d'obtenir les droits
+administrateur.
+
+---
+
 ## Revenir en arrière après une mise à jour
 
 `snap-pac` prend un snapshot avant et après chaque transaction pacman. C'est ce

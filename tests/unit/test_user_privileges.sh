@@ -61,12 +61,14 @@ source "${ROOT}/lib/users.sh"
 CHROOT_GROUPS="reaper wheel audio video"
 SUDO_PRESENT="true"
 SUDO_LIST="true"
+ROOT_STATUS="root P 07/29/2026 0 99999 7 -1"
 
 run_in_chroot() {
     case "$*" in
         *"id --name --groups"*) printf '%s\n' "${CHROOT_GROUPS}" ;;
         *"command -v sudo"*) [[ "${SUDO_PRESENT}" == "true" ]] ;;
         *"sudo --list"*) [[ "${SUDO_LIST}" == "true" ]] ;;
+        *"passwd --status root"*) printf '%s\n' "${ROOT_STATUS}" ;;
         *) return 0 ;;
     esac
 }
@@ -113,6 +115,57 @@ SUDO_LIST="true"
 DRY_RUN="true"
 verify_installed_user_privileges
 printf '%s\n' 'ok - verification is skipped in dry-run'
+
+# -- the root fallback ---------------------------------------------------------
+
+# A locked root plus any fault in the sudo path leaves no way in at all, which on
+# an encrypted disk means reinstalling.
+DRY_RUN="false"
+
+ROOT_STATUS="root P 07/29/2026 0 99999 7 -1"
+root_password_is_set
+verify_root_password
+printf '%s\n' 'ok - a usable root password verifies'
+
+# What a fresh pacstrap leaves behind.
+ROOT_STATUS="root L 07/29/2026 0 99999 7 -1"
+if root_password_is_set; then
+    printf '%s\n' 'not ok - a locked root account counted as having a password' >&2
+    exit 1
+fi
+if verify_root_password 2>/dev/null; then
+    printf '%s\n' 'not ok - a locked root account was accepted' >&2
+    exit 1
+fi
+printf '%s\n' 'ok - a locked root account is refused'
+
+ROOT_STATUS="root NP 07/29/2026 0 99999 7 -1"
+if verify_root_password 2>/dev/null; then
+    printf '%s\n' 'not ok - an empty root password was accepted' >&2
+    exit 1
+fi
+printf '%s\n' 'ok - an empty root password is refused'
+
+DRY_RUN="true"
+verify_root_password
+printf '%s\n' 'ok - the root check is skipped in dry-run'
+
+# Re-running an installation must not prompt again for a password that exists.
+ROOT_STATUS="root P 07/29/2026 0 99999 7 -1"
+DRY_RUN="false"
+PROMPTED="false"
+arch-chroot() { PROMPTED="true"; }
+set_root_password >/dev/null
+[[ "${PROMPTED}" == "false" ]]
+printf '%s\n' 'ok - an existing root password is left alone'
+
+# And must prompt when there is none.
+ROOT_STATUS="root L 07/29/2026 0 99999 7 -1"
+PROMPTED="false"
+log_message() { :; }
+set_root_password >/dev/null
+[[ "${PROMPTED}" == "true" ]]
+printf '%s\n' 'ok - a locked root account is prompted for a password'
 
 # -- the shipped configuration -------------------------------------------------
 
