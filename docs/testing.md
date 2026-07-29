@@ -28,6 +28,7 @@ bash tests/unit/test_snapshots.sh
 bash tests/unit/test_aur_setup.sh
 bash tests/unit/test_provider.sh
 bash tests/unit/test_keyboard_layout.sh
+bash tests/unit/test_user_privileges.sh
 bash tests/unit/test_config_values.sh
 bash tests/unit/test_user_configuration.sh
 bash tests/unit/test_services.sh

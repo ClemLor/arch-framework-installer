@@ -75,6 +75,8 @@ verify_installed_user() {
     run_in_chroot id "${USERNAME}" >/dev/null || return 1
     verify_installed_user_home || return 1
     run_in_chroot visudo -cf /etc/sudoers.d/10-wheel >/dev/null || return 1
+    # The file being valid says nothing about the account being in wheel.
+    verify_installed_user_privileges || return 1
     desktop_verify_user
 }
 

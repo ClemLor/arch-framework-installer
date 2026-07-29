@@ -19,6 +19,42 @@ prepare_installed_user_home() {
         "${home_path}/.local/bin"
 }
 
+# Membership is checked separately from the sudoers file.
+#
+# The file granting %wheel and the account being in wheel are two independent
+# facts, and each looks correct on its own. Only together do they give the user
+# any administrative access, so verifying one has never implied the other.
+verify_installed_user_privileges() {
+    local groups
+
+    [[ "${DRY_RUN:-false}" == "true" ]] && return 0
+
+    groups="$(run_in_chroot id --name --groups "${USERNAME}")" || {
+        error "Could not read the groups of ${USERNAME}."
+        return 1
+    }
+
+    if [[ " ${groups} " != *" wheel "* ]]; then
+        error "${USERNAME} is not in the wheel group; sudo would not work."
+        error "Groups: ${groups}"
+        return 1
+    fi
+
+    # An empty sudo binary check is not enough: the drop-in is useless if the
+    # package is absent, and pacstrap could have been given a shortened list.
+    run_in_chroot command -v sudo >/dev/null || {
+        error "sudo is not installed in the target."
+        return 1
+    }
+
+    # Asks sudo itself whether the rule applies, rather than trusting that a
+    # syntactically valid file grants what it appears to grant.
+    run_in_chroot sudo --list --user "${USERNAME}" >/dev/null || {
+        error "sudo does not grant ${USERNAME} any privileges."
+        return 1
+    }
+}
+
 verify_installed_user_home() {
     local home_path="/home/${USERNAME}"
     local path

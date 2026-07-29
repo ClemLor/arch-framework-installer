@@ -89,7 +89,7 @@ require_validation_commands() {
     # Only list tools required to run the validator itself. Desktop programs
     # such as niri are part of the installation under test and must produce a
     # failed check without aborting the remaining diagnostics.
-    for command_name in btrfs cmp cryptsetup find findmnt grep id jq lsattr lsblk pacman pgrep runuser snapper swapon systemctl; do
+    for command_name in btrfs cmp cryptsetup find findmnt grep id jq lsattr lsblk pacman pgrep runuser snapper sudo swapon systemctl visudo; do
         command -v "${command_name}" >/dev/null || {
             printf 'Missing validation command: %s\n' "${command_name}" >&2
             return 1
@@ -276,6 +276,27 @@ validate_hibernation_profile() {
     lsattr -d /swap/swapfile | grep -q 'C'
 }
 
+# Root has no password on a fresh pacstrap, so sudo through wheel is the only
+# administrative access this machine has. Checked here as well as during the
+# install, because by now the ISO is gone and losing it means reinstalling.
+validate_user_privileges() {
+    id --name --groups "${TARGET_USERNAME}" | grep -qw wheel || {
+        printf '%s is not in the wheel group; there is no way to administer this machine.\n' \
+            "${TARGET_USERNAME}" >&2
+        return 1
+    }
+
+    command -v sudo >/dev/null || return 1
+    [[ -s /etc/sudoers.d/10-wheel ]] || return 1
+    visudo -cf /etc/sudoers.d/10-wheel >/dev/null || return 1
+
+    # Asks sudo what it actually grants, rather than trusting a valid file.
+    sudo --list --user "${TARGET_USERNAME}" >/dev/null || {
+        printf 'sudo grants %s nothing.\n' "${TARGET_USERNAME}" >&2
+        return 1
+    }
+}
+
 validate_user_desktop() {
     local niri_config="/home/${TARGET_USERNAME}/.config/niri/config.kdl"
     local niri_dropin="/home/${TARGET_USERNAME}/.config/systemd/user/niri.service.d/dms.conf"
@@ -334,6 +355,7 @@ main() {
     record_check "required desktop and recovery packages are installed" validate_packages
     record_check "a DRM render node is available to Niri" graphics_render_node_available
     record_check "system services and graphical target are ready" validate_services
+    record_check "the user can administer the machine through sudo" validate_user_privileges
     record_check "the configured user has an active Niri/DMS session" validate_user_desktop
     record_check "zram matches the selected profile" validate_zram_profile
     record_check "the kernel is tuned to actually use zram" validate_zram_tuning

@@ -156,6 +156,19 @@ validate_identity_configuration() {
         error "USER_GROUPS must be a comma-separated list of valid group names."
         return 1
     fi
+
+    # The installer never sets a root password, so root stays locked and sudo is
+    # the only administrative access the machine has. The sudoers drop-in grants
+    # %wheel; an account outside wheel therefore cannot administer the system at
+    # all — and every individual piece still looks correct, which is why this is
+    # checked rather than assumed.
+    if [[ ",${user_groups}," != *,wheel,* ]]; then
+        error "USER_GROUPS must include 'wheel'."
+        error "Root has no password, so sudo through wheel is the only way to"
+        error "administer the installed system. Without it the result is"
+        error "unadministrable, including for afi-aur-setup after the first boot."
+        return 1
+    fi
 }
 
 validate_locale_configuration() {
