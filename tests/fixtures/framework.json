@@ -3,7 +3,12 @@
     "A Framework 13 booted from the Arch ISO on a USB stick.",
     "Recorded shape: lsblk --json --bytes --paths --output-all, plus the mount",
     "targets and sysfs files the safety layer reads.",
-    "nvme0n1 is the intended target. sdb is the live medium and must be refused."
+    "nvme0n1 is the intended target. sdb is the live medium and must be refused.",
+    "The efivar under files_base64 is 4 attribute bytes then the state byte:",
+    "06 00 00 00 01 means Secure Boot enabled.",
+    "pkname is written in both the bare and prefixed form on purpose. lsblk's",
+    "documentation does not settle whether --paths prefixes it, so the code must",
+    "not care; it records the parent itself and normalises what it reads."
   ],
   "blockdevices": [
     {
@@ -25,6 +30,7 @@
         {
           "name": "/dev/nvme0n1p1",
           "path": "/dev/nvme0n1p1",
+          "pkname": "nvme0n1",
           "type": "part",
           "size": 1073741824,
           "fstype": "vfat",
@@ -33,6 +39,7 @@
         {
           "name": "/dev/nvme0n1p2",
           "path": "/dev/nvme0n1p2",
+          "pkname": "/dev/nvme0n1",
           "type": "part",
           "size": 999129317376,
           "fstype": "crypto_LUKS",
@@ -79,8 +86,10 @@
     "/sys/class/dmi/id/bios_vendor": "INSYDE Corp.\n",
     "/sys/class/dmi/id/bios_version": "03.05\n",
     "/proc/cpuinfo": "processor\t: 0\nvendor_id\t: AuthenticAMD\nmodel name\t: AMD Ryzen 7 7840U w/ Radeon 780M Graphics\n",
-    "/proc/meminfo": "MemTotal:       32570676 kB\nMemFree:        30000000 kB\n",
-    "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c": "\u0006\u0000\u0000\u0000\u0001"
+    "/proc/meminfo": "MemTotal:       32570676 kB\nMemFree:        30000000 kB\n"
+  },
+  "files_base64": {
+    "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c": "BgAAAAE="
   },
   "paths": [
     "/run/archiso",

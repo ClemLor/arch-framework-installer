@@ -1,0 +1,18 @@
+# Shell scripts and Python must reach the Arch ISO with LF endings. A CRLF
+# shebang line fails with `$'\r': command not found`, which reads as a corrupt
+# script rather than a line-ending problem.
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.py   text eol=lf
+*.conf text eol=lf
+*.list text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+
+# The WSL helper runs under Windows PowerShell.
+*.ps1  text eol=crlf
+
+# Templates are written into the target system verbatim.
+templates/* text eol=lf

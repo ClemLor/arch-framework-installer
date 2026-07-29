@@ -14,6 +14,11 @@ from .models.size import Size
 
 _DMI = "/sys/class/dmi/id"
 
+#: The GUID is the EFI global variable namespace and is fixed.
+SECURE_BOOT_EFIVAR = (
+    "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
+)
+
 
 def _first_line(text: str | None) -> str | None:
     if text is None:
@@ -96,19 +101,19 @@ class Hardware:
     def secure_boot_state(self) -> str:
         """Read from the SecureBoot efivar.
 
-        The variable is a 4-byte attribute prefix followed by one data byte, so
-        the state is byte 4 — not byte 0.
+        Read as bytes, not text: the variable is binary, and decoding it as
+        UTF-8 with replacement characters would collapse byte runs into single
+        code points and shift the offset. The layout is a 4-byte attribute
+        prefix followed by one data byte, so the state is byte 4 — not byte 0.
         """
         if not self.is_uefi():
             return "Unavailable"
 
-        raw = self.source.read_text(
-            "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
-        )
+        raw = self.source.read_bytes(SECURE_BOOT_EFIVAR)
         if raw is None or len(raw) < 5:
             return "Unknown"
 
-        return {"\x01": "Enabled", "\x00": "Disabled"}.get(raw[4], "Unknown")
+        return {1: "Enabled", 0: "Disabled"}.get(raw[4], "Unknown")
 
     def is_live_environment(self) -> bool:
         """Whether this is a booted Arch ISO.

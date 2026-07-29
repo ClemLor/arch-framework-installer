@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from arch_framework.lib.disk.source import FixtureSource
-from arch_framework.lib.hardware import Hardware
+from arch_framework.lib.hardware import SECURE_BOOT_EFIVAR, Hardware
 from arch_framework.lib.models import Size
 
 
@@ -26,6 +26,31 @@ def test_detects_uefi_and_secure_boot(framework_source: FixtureSource) -> None:
     assert hardware.is_uefi()
     # Byte 4 of the efivar carries the state; bytes 0-3 are attributes.
     assert hardware.secure_boot_state() == "Enabled"
+
+
+def test_secure_boot_disabled() -> None:
+    source = FixtureSource(
+        {
+            "files_base64": {SECURE_BOOT_EFIVAR: "BgAAAAA="},
+            "paths": ["/sys/firmware/efi/efivars"],
+        }
+    )
+    assert Hardware(source).secure_boot_state() == "Disabled"
+
+
+def test_secure_boot_unknown_when_efivar_is_truncated() -> None:
+    source = FixtureSource(
+        {
+            "files_base64": {SECURE_BOOT_EFIVAR: "BgAA"},
+            "paths": ["/sys/firmware/efi/efivars"],
+        }
+    )
+    assert Hardware(source).secure_boot_state() == "Unknown"
+
+
+def test_secure_boot_unavailable_without_uefi() -> None:
+    source = FixtureSource({"files_base64": {SECURE_BOOT_EFIVAR: "BgAAAAE="}})
+    assert Hardware(source).secure_boot_state() == "Unavailable"
 
 
 def test_detects_the_live_environment(framework_source: FixtureSource) -> None:

@@ -165,6 +165,14 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         log.warn("Interrupted.")
         return 130
+    except EOFError:
+        # Reached when a renderer prompts with no interactive stdin, such as a
+        # piped or scripted run. A traceback here would read as a crash.
+        log.error(
+            "No input available. Pass --config to run without prompting, "
+            "or run from a terminal."
+        )
+        return 1
 
 
 if __name__ == "__main__":
