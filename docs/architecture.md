@@ -14,26 +14,29 @@ Cette organisation permet de rendre le projet simple à comprendre, facile à ma
 
 ```
 arch-framework-installer/
-├── assets/
 ├── config/
 ├── docs/
 ├── lib/
 ├── packages/
-├── scripts/
 ├── services/
-├── tests/
+├── tasks/
+├── templates/
 ├── install.sh
-├── bootstrap.sh
+├── uninstall.sh
 └── PROJECT.md
 ```
+
+Les dossiers `assets/` et `tests/`, ainsi que `bootstrap.sh`, sont prévus mais
+n'existent pas encore. Ils sont décrits ci-dessous à titre d'intention.
 
 ---
 
 # Organisation
 
-## assets/
+## assets/ (prévu)
 
-Contient les ressources statiques utilisées par le projet.
+Contient les ressources statiques utilisées par le projet. Le dossier n'existe
+pas encore.
 
 Exemples :
 
@@ -50,12 +53,9 @@ Aucun fichier de configuration ne doit être placé ici.
 
 Contient uniquement les fichiers de configuration utilisés par les scripts.
 
-Exemples :
-
-- variables
-- paramètres utilisateur
-- listes de modules
-- options d'installation
+Actuellement, `config/system.conf` contient l'intégralité de la configuration et
+constitue la source de vérité. Les autres fichiers `.conf` sont des espaces
+réservés vides.
 
 Les scripts lisent ces fichiers mais ne les modifient jamais.
 
@@ -85,14 +85,12 @@ Chaque fichier correspond à un domaine technique.
 Exemples :
 
 ```
-disk.sh
-btrfs.sh
-luks.sh
-boot.sh
-network.sh
-users.sh
-desktop.sh
+disk.sh      btrfs.sh     luks.sh
+bootloader.sh  mount.sh   users.sh
+commands.sh  logging.sh   validation.sh
 ```
+
+La majorité de ces fichiers sont encore vides.
 
 Les fichiers de ce dossier ne doivent jamais être exécutés directement.
 
@@ -104,34 +102,56 @@ Ils sont uniquement importés par les scripts.
 
 Définition des paquets à installer.
 
-Les listes sont séparées par catégories.
+Les listes sont séparées par catégories, avec l'extension `.list` : un paquet
+par ligne, sans syntaxe shell.
 
 Exemple :
 
 ```
-base.conf
-desktop.conf
-development.conf
-fonts.conf
+base.list
+desktop.list
+development.list
+fonts.list
 ```
 
 Les scripts utilisent ces listes pour installer les paquets.
 
 ---
 
-## scripts/
+## tasks/
 
-Scripts exécutables.
+Étapes d'installation, numérotées selon leur ordre d'exécution.
 
-Chaque script réalise une tâche complète.
+```
+00_environment.sh   40_mount.sh          90_bootloader.sh
+05_disk_selection.sh 50_base_system.sh   95_security.sh
+10_storage.sh       60_configuration.sh  98_cleanup.sh
+20_encryption.sh    70_packages.sh       99_finish.sh
+30_filesystem.sh    80_users.sh
+```
 
-Exemples :
+Chaque étape utilise les fonctions de `lib/` et n'exécute aucune commande
+destructive directement.
 
-- install.sh
-- update.sh
-- health-check.sh
+---
 
-Les scripts utilisent les fonctions présentes dans `lib/`.
+## templates/
+
+Modèles de fichiers de configuration écrits dans le système cible : `fstab`,
+`crypttab`, `hostname`, `hosts`, `locale.gen`, `mkinitcpio.conf`,
+`limine.conf`.
+
+---
+
+## Scripts exécutables
+
+Les scripts exécutables sont situés à la racine du dépôt, pas dans un dossier
+`scripts/`.
+
+- `install.sh` : orchestrateur unique de l'installation
+- `uninstall.sh` : non encore implémenté
+
+Ils utilisent les fonctions présentes dans `lib/`.
 
 ---
 
@@ -147,13 +167,17 @@ Exemples :
 
 ---
 
-## tests/
+## tests/ (prévu)
 
-Tests automatiques.
+Tests automatiques. Le dossier n'existe pas encore.
 
-Chaque module important possède ses propres tests.
+Chaque module important possédera ses propres tests.
 
-Les tests permettent de vérifier que les scripts restent fonctionnels après les modifications.
+En attendant, la seule vérification statique disponible est :
+
+```bash
+shellcheck -x install.sh lib/*.sh
+```
 
 ---
 

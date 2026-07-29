@@ -359,10 +359,24 @@ is_complete_disk() {
 is_installation_candidate() {
     local disk="$1"
 
-    is_complete_disk "${disk}" || return 1
-    is_live_medium_disk "${disk}" && return 1
-    is_usb_disk "${disk}" && return 1
-    is_removable_disk "${disk}" && return 1
+    # Written with explicit blocks rather than "guard && return 1": the latter
+    # makes the function exit with the status of the failed guard, which kills
+    # the caller under set -e unless every call site sits in a condition.
+    if ! is_complete_disk "${disk}"; then
+        return 1
+    fi
+
+    if is_live_medium_disk "${disk}"; then
+        return 1
+    fi
+
+    if is_usb_disk "${disk}"; then
+        return 1
+    fi
+
+    if is_removable_disk "${disk}"; then
+        return 1
+    fi
 
     return 0
 }

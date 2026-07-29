@@ -113,6 +113,13 @@ validate_btrfs_subvolumes() {
     local configured_subvolume
     local found
 
+    # Conditional on purpose. Requiring @swap unconditionally would make
+    # hibernation structurally mandatory, and hibernation is meant to stay a
+    # user choice.
+    if [[ "${HIBERNATION_ENABLED:-false}" == "true" ]]; then
+        required_subvolumes+=("@swap")
+    fi
+
     for required_subvolume in "${required_subvolumes[@]}"; do
         found="false"
 

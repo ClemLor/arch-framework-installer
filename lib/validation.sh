@@ -187,8 +187,19 @@ validate_environment() {
     validate_required_commands || validation_failed="true"
     validate_target_disk || validation_failed="true"
     validate_target_disk_not_mounted || validation_failed="true"
-    validate_dns_resolution || validation_failed="true"
-    validate_internet_connection || validation_failed="true"
+
+    # Network access is only needed to actually fetch packages. Blocking a
+    # dry-run on it would make the rehearsal impossible offline, which is
+    # exactly when rehearsing is most useful.
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        validate_dns_resolution ||
+            warn "DNS validation failed; accepted because dry-run mode is enabled."
+        validate_internet_connection ||
+            warn "Connectivity validation failed; accepted because dry-run mode is enabled."
+    else
+        validate_dns_resolution || validation_failed="true"
+        validate_internet_connection || validation_failed="true"
+    fi
 
     if [[ "${validation_failed}" == "true" ]]; then
         fatal "Environment validation failed."

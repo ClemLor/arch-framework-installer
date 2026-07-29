@@ -111,9 +111,18 @@ validate_partition_dependencies() {
     success "Storage planning commands are available."
 }
 
+# Smallest root filesystem this project considers usable once EFI and swap are
+# carved out. Not configurable on purpose: it is a sanity floor, not a tuning
+# knob.
+readonly MINIMUM_ROOT_SIZE_MIB=20480
+
 validate_target_disk_capacity() {
     local disk_size_bytes
     local minimum_size_bytes
+    local efi_mib
+    local swap_mib
+    local required_mib
+    local available_root_mib
 
     disk_size_bytes="$(get_disk_size_bytes "${TARGET_DISK}")"
     minimum_size_bytes="$(size_to_bytes "${MINIMUM_DISK_SIZE}")"
@@ -131,7 +140,26 @@ validate_target_disk_capacity() {
         return 1
     fi
 
+    # MINIMUM_DISK_SIZE alone says nothing about whether the requested swapfile
+    # actually leaves a usable root filesystem behind.
+    efi_mib="$(size_to_mib "${EFI_SIZE}")" || return 1
+    swap_mib="$(size_to_mib "${SWAP_SIZE}")" || return 1
+
+    required_mib=$((efi_mib + swap_mib + MINIMUM_ROOT_SIZE_MIB))
+    available_root_mib=$((disk_size_bytes / 1024 / 1024 - efi_mib - swap_mib))
+
+    if ((disk_size_bytes / 1024 / 1024 < required_mib)); then
+        error "The target disk cannot hold the planned layout."
+        error "Detected:  $(format_bytes "${disk_size_bytes}")"
+        error "EFI:       ${EFI_SIZE}"
+        error "Swap:      ${SWAP_SIZE}"
+        error "Root floor: $((MINIMUM_ROOT_SIZE_MIB / 1024))GiB"
+        error "Root left: $((available_root_mib / 1024))GiB"
+        return 1
+    fi
+
     success "Target disk capacity is sufficient."
+    info "Root filesystem would get roughly $((available_root_mib / 1024))GiB."
 }
 
 validate_efi_partition_size() {
@@ -282,12 +310,14 @@ show_partition_commands() {
     printf 'wipefs --all %q\n' "${TARGET_DISK}"
     printf 'sgdisk --zap-all %q\n' "${TARGET_DISK}"
 
-    printf 'sgdisk --new=1:1MiB:%sMiB --typecode=1:ef00 --change-name=1:%q %q\n' \
+    # sgdisk accepts K/M/G/T/P suffixes, which already mean KiB/MiB/GiB. It does
+    # not understand "MiB" and rejects the whole option.
+    printf 'sgdisk --new=1:1M:%sM --typecode=1:ef00 --change-name=1:%q %q\n' \
         "${efi_end_mib}" \
         "${EFI_PARTITION_LABEL}" \
         "${TARGET_DISK}"
 
-    printf 'sgdisk --new=2:%sMiB:0 --typecode=2:8309 --change-name=2:%q %q\n' \
+    printf 'sgdisk --new=2:%sM:0 --typecode=2:8309 --change-name=2:%q %q\n' \
         "${efi_end_mib}" \
         "${SYSTEM_PARTITION_LABEL}" \
         "${TARGET_DISK}"
