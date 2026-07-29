@@ -5,6 +5,11 @@ if [[ -n "${ARCH_INSTALLER_STATE_LOADED:-}" ]]; then
 fi
 readonly ARCH_INSTALLER_STATE_LOADED="true"
 
+# See the note in lib/logging.sh: events are optional, stubbed only if absent.
+if ! declare -F event_emit >/dev/null; then
+    event_interrupt() { :; }
+fi
+
 declare -ag TASK_COMPLETED=()
 TASK_CURRENT=""
 TASK_PHASE=""
@@ -12,6 +17,11 @@ TASK_INTERRUPTED="false"
 TASK_SIGNAL=""
 INSTALL_STARTED_AT=0
 STATE_FILE="${STATE_FILE:-}"
+# Whether anything was rolled back, and whether a short run was asked for. Both
+# are reported at the end: a failure with a clean rollback and a run stopped on
+# purpose by --partition are not the same outcome as an installation that failed.
+TASK_ROLLBACK_HAPPENED="false"
+TASK_STOPPED_AFTER=""
 
 state_init() {
     local root="$1"
@@ -44,6 +54,8 @@ state_reset() {
     TASK_PHASE=""
     TASK_INTERRUPTED="false"
     TASK_SIGNAL=""
+    TASK_ROLLBACK_HAPPENED="false"
+    TASK_STOPPED_AFTER=""
     INSTALL_STARTED_AT="$(date +%s)"
     state_persist
 }
@@ -57,6 +69,7 @@ state_request_interrupt() {
     TASK_INTERRUPTED="true"
     TASK_SIGNAL="$1"
     state_persist
+    event_interrupt "${TASK_SIGNAL}"
     warn "Signal ${TASK_SIGNAL} received; cleanup and rollback will run."
 }
 

@@ -27,6 +27,11 @@ PARTITION_ONLY_MODE="false"
 # shellcheck source=lib/logging.sh
 source "${SCRIPT_DIR}/lib/logging.sh"
 
+# Sourced right after logging, because log_message emits an event for every
+# message and the ones from configuration loading are worth having.
+# shellcheck source=lib/events.sh
+source "${SCRIPT_DIR}/lib/events.sh"
+
 # shellcheck source=lib/common.sh
 source "${SCRIPT_DIR}/lib/common.sh"
 
@@ -247,13 +252,22 @@ inspect_system() {
 }
 
 main() {
+    local status=0
+
     parse_arguments "$@"
     validate_execution_mode
+
+    # Before load_config, so a configuration that refuses to load is reported to
+    # a watching front-end instead of looking like a silent hang. The EXIT trap
+    # covers the fatal paths, which never reach the end of this function.
+    event_init
+    trap 'event_run_end_once "$?"' EXIT
 
     load_config
     apply_cli_overrides
     init_logging "${SCRIPT_DIR}"
     state_init "${SCRIPT_DIR}"
+    event_run_begin "${SCRIPT_DIR}/tasks"
 
     if [[ "${INSPECT_MODE}" == "true" ]]; then
         inspect_system
@@ -269,12 +283,22 @@ main() {
         TASK_STOP_AFTER="storage"
     fi
 
-    if ! task_run_all "${SCRIPT_DIR}/tasks"; then
+    # Not `if ! task_run_all`: after a negation $? is the negation's own result,
+    # so the real status — 130 for an interrupt, the task's code otherwise — would
+    # be lost and every failure would look alike.
+    if task_run_all "${SCRIPT_DIR}/tasks"; then
+        status=0
+    else
+        status=$?
         error "Installation workflow failed. See ${LOG_FILE}."
-        return 1
+        # The real status is carried through: 130 is an interrupt the user asked
+        # for, and a front-end reports that differently from a failure.
+        event_run_end_once "${status}"
+        return "${status}"
     fi
 
     success "Installation workflow completed. Log: ${LOG_FILE}"
+    event_run_end_once 0
 }
 
 main "$@"

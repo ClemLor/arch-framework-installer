@@ -5,6 +5,18 @@ if [[ -n "${ARCH_INSTALLER_TASK_LOADED:-}" ]]; then
 fi
 readonly ARCH_INSTALLER_TASK_LOADED="true"
 
+# See the note in lib/logging.sh: events are optional, stubbed only if absent.
+if ! declare -F event_emit >/dev/null; then
+    event_plan() { :; }
+    event_plan_task() { :; }
+    event_task_begin() { :; }
+    event_phase() { :; }
+    event_task_end() { :; }
+    event_task_failed() { :; }
+    event_rollback_begin() { :; }
+    event_rollback_end() { :; }
+fi
+
 declare -ag TASK_IDS=()
 declare -Ag TASK_FILES=()
 
@@ -70,10 +82,27 @@ task_run_cleanup() {
     "${cleanup_function}"
 }
 
+# The plan, announced once discovery has read it.
+#
+# Emitted here rather than inside task_discover so discovery stays a pure listing
+# operation, which is what its test checks.
+task_emit_plan() {
+    local total="$1"
+    local index=0
+    local id
+
+    event_plan "${total}"
+    for id in "${TASK_IDS[@]}"; do
+        ((index += 1))
+        event_plan_task "${index}" "${id}" "$("$(task_function "${id}" name)")"
+    done
+}
+
 task_rollback_completed() {
     local index
     local id
     local rollback_function
+    local status
     local failed="false"
 
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
@@ -87,10 +116,15 @@ task_rollback_completed() {
         TASK_PHASE="rollback"
         state_persist
         warn "Rolling back task: ${id}"
+        TASK_ROLLBACK_HAPPENED="true"
+        event_rollback_begin "${id}" completed
+        status=0
         if ! "${rollback_function}"; then
+            status=1
             error "Rollback failed for task: ${id}"
             failed="true"
         fi
+        event_rollback_end "${id}" completed "${status}"
     done
 
     [[ "${failed}" == "false" ]]
@@ -105,8 +139,12 @@ task_run_one() {
     local phase
     local function_name
     local started_at
+    local duration
     local status=0
     local execute_started="false"
+    # Captured when it fails, because `phase` is reassigned below when cleanup
+    # also fails, and "execute failed" is the fact worth reporting.
+    local failed_phase=""
 
     name_function="$(task_function "${id}" name)"
     name="$("${name_function}")"
@@ -114,6 +152,7 @@ task_run_one() {
     state_persist
     started_at="$(date +%s)"
     progress_start "${current}" "${total}" "${name}"
+    event_task_begin "${current}" "${total}" "${id}" "${name}"
 
     if declare -F run_hook_directory >/dev/null; then
         run_hook_directory "$(project_root)/hooks/pre-task" || return 1
@@ -126,29 +165,49 @@ task_run_one() {
         fi
         TASK_PHASE="${phase}"
         state_persist
+        event_phase "${current}" "${id}" "${phase}"
         [[ "${phase}" == "execute" ]] && execute_started="true"
         function_name="$(task_function "${id}" "${phase}")"
         log_message "TASK" "${id}: ${phase} started"
-        if ! "${function_name}"; then
+        # `if "${f}"; then :; else status=$?; fi` rather than `if ! "${f}"`: after
+        # a negation, $? is the negation's own result, so every failure used to be
+        # reported as 1 and the phase's real exit code was lost.
+        if "${function_name}"; then
+            :
+        else
             status=$?
             [[ "${status}" -ne 0 ]] || status=1
+            failed_phase="${phase}"
             log_message "TASK" "${id}: ${phase} failed status=${status}"
             break
         fi
     done
 
+    event_phase "${current}" "${id}" cleanup
     if ! task_run_cleanup "${id}"; then
         [[ "${status}" -ne 0 ]] || status=1
         phase="cleanup"
+        [[ -n "${failed_phase}" ]] || failed_phase="cleanup"
     fi
 
     if [[ "${status}" -ne 0 ]]; then
+        # An interrupt breaks the loop without any phase having failed, so the
+        # phase it was noticed in is the honest answer.
+        [[ -n "${failed_phase}" ]] || failed_phase="${phase}"
         if [[ "${execute_started}" == "true" ]] && [[ "${DRY_RUN:-false}" != "true" ]]; then
             function_name="$(task_function "${id}" rollback)"
             warn "Rolling back partially executed task: ${id}"
-            "${function_name}" || error "Rollback failed for partially executed task: ${id}"
+            TASK_ROLLBACK_HAPPENED="true"
+            event_rollback_begin "${id}" partial
+            if "${function_name}"; then
+                event_rollback_end "${id}" partial 0
+            else
+                error "Rollback failed for partially executed task: ${id}"
+                event_rollback_end "${id}" partial 1
+            fi
         fi
         progress_failure "${current}" "${total}" "${name}" "${phase}"
+        event_task_failed "${current}" "${id}" "${failed_phase}" "${status}"
         return "${status}"
     fi
 
@@ -161,7 +220,9 @@ task_run_one() {
     fi
 
     state_mark_completed "${id}"
-    progress_success "${current}" "${total}" "${name}" "$(( $(date +%s) - started_at ))"
+    duration="$(( $(date +%s) - started_at ))"
+    progress_success "${current}" "${total}" "${name}" "${duration}"
+    event_task_end "${current}" "${id}" "${duration}"
 }
 
 task_run_all() {
@@ -174,6 +235,7 @@ task_run_all() {
     state_reset
     task_discover "${tasks_directory}" || return 1
     total="${#TASK_IDS[@]}"
+    task_emit_plan "${total}"
     trap 'state_request_interrupt INT' INT
     trap 'state_request_interrupt TERM' TERM
 
@@ -193,6 +255,7 @@ task_run_all() {
             break
         fi
         if [[ -n "${TASK_STOP_AFTER:-}" ]] && [[ "${id}" == "${TASK_STOP_AFTER}" ]]; then
+            TASK_STOPPED_AFTER="${id}"
             break
         fi
     done

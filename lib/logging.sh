@@ -16,6 +16,14 @@ fi
 
 readonly ARCH_INSTALLER_LOGGING_LOADED="true"
 
+# lib/events.sh is an optional observer: the unit tests source single modules,
+# and an installation with no front-end watching never loads it. Defined only
+# when absent, so sourcing order does not matter and the real implementation is
+# never replaced by a stub.
+if ! declare -F event_emit >/dev/null; then
+    event_log() { :; }
+fi
+
 readonly LOG_RESET='\033[0m'
 readonly LOG_BLUE='\033[0;34m'
 readonly LOG_GREEN='\033[0;32m'
@@ -38,6 +46,11 @@ init_logging() {
 log_message() {
     local level="$1"
     shift
+
+    # Emitted outside the LOG_FILE guard on purpose: everything before
+    # init_logging — configuration loading, and the failures there — is exactly
+    # what a front-end needs to show, and it has nowhere else to read it from.
+    event_log "${level}" "$*"
 
     if [[ -n "${LOG_FILE}" ]]; then
         printf '%s [%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "${level}" "$*" >>"${LOG_FILE}"
