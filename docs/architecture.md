@@ -2,272 +2,180 @@
 
 ## Objectif
 
-L'objectif de cette architecture est de séparer clairement les responsabilités de chaque composant du projet.
-
-Chaque dossier possède un rôle unique et ne doit pas contenir d'éléments qui ne lui appartiennent pas.
-
-Cette organisation permet de rendre le projet simple à comprendre, facile à maintenir et facilement extensible.
+Séparer les responsabilités de manière à ce que chaque décision soit vérifiable
+sans matériel, et que le seul code capable de détruire des données soit
+identifiable et concentré.
 
 ---
 
-# Vue d'ensemble
+## Vue d'ensemble
 
 ```
 arch-framework-installer/
-├── config/
+├── arch_framework/          # l'installateur
+│   ├── main.py              # point d'entrée, analyse des arguments
+│   ├── lib/
+│   │   ├── models/          # schéma de configuration (pydantic)
+│   │   ├── disk/            # périphériques, sécurité, partitions, LUKS, Btrfs
+│   │   ├── bootloader/      # Limine
+│   │   ├── command.py       # LA porte pour toute commande système
+│   │   ├── target.py        # écriture dans /mnt
+│   │   ├── installer.py     # orchestration des étapes
+│   │   ├── configure.py     # fichiers de configuration du système cible
+│   │   ├── packages.py      # résolution des listes, pacstrap
+│   │   ├── users.py         # comptes et sudo
+│   │   ├── hardware.py      # micrologiciel, mémoire, environnement live
+│   │   └── state.py         # reprise après échec
+│   ├── tui/                 # menu guidé : registre + deux rendus
+│   ├── scripts/             # flux complets (guided, credentials)
+│   └── profiles/            # valeurs par défaut Framework
+├── packages/                # listes de paquets, un fichier par groupe
+├── tests/
+│   └── golden/              # séquence de commandes de référence
 ├── docs/
-├── lib/
-├── packages/
-├── services/
-├── tasks/
-├── templates/
-├── install.sh
-├── uninstall.sh
+├── tools/                   # sync-to-wsl.ps1
+├── lib/ + install.sh        # implémentation Bash, conservée en repli
 └── PROJECT.md
 ```
 
-Les dossiers `assets/` et `tests/`, ainsi que `bootstrap.sh`, sont prévus mais
-n'existent pas encore. Ils sont décrits ci-dessous à titre d'intention.
+L'arborescence Bash (`lib/`, `install.sh`, `tasks/`, `templates/`) reste présente
+sur `main` comme repli tant que le chemin Python n'a pas été validé sur du
+matériel réel. Aucune fonctionnalité nouvelle n'y est ajoutée.
 
 ---
 
-# Organisation
+## La règle centrale
 
-## assets/ (prévu)
+**Rien ne modifie le système en dehors de `lib/command.py` et
+`lib/target.py`.**
 
-Contient les ressources statiques utilisées par le projet. Le dossier n'existe
-pas encore.
+C'est ce qui rend `--dry-run` fiable. Une commande écrite en direct, ou un
+`Path.write_text` vers `/mnt`, contournerait le mode simulation et créerait des
+fichiers en prétendant ne rien changer.
 
-Exemples :
+Trois opérations, volontairement distinctes :
 
-- logos
-- captures d'écran
-- illustrations
-- modèles
+| Opération | Modifie | En simulation |
+| --- | --- | --- |
+| `run` | oui | n'exécute pas |
+| `capture` | non | **exécute quand même** |
+| `derived` | non | renvoie un marqueur explicite |
 
-Aucun fichier de configuration ne doit être placé ici.
+`capture` s'exécute toujours parce que sa sortie est consommée comme une valeur :
+un substitut silencieux corromprait toutes les décisions qui en découlent.
 
----
-
-## config/
-
-Contient uniquement les fichiers de configuration utilisés par les scripts.
-
-Actuellement, `config/system.conf` contient l'intégralité de la configuration et
-constitue la source de vérité. Les autres fichiers `.conf` sont des espaces
-réservés vides.
-
-Les scripts lisent ces fichiers mais ne les modifient jamais.
+`derived` existe pour les valeurs qui n'existent qu'après une étape antérieure —
+UUID, décalage de reprise. En simulation, le système de fichiers n'a pas été
+créé : `blkid` ne renvoie rien, et `fstab`, `crypttab` et `limine.conf` seraient
+rendus vides, donc invérifiables. Le marqueur `<UUID-of-…>` les garde lisibles et
+visiblement factices.
 
 ---
 
-## docs/
-
-Documentation complète du projet.
-
-Chaque domaine possède son propre document.
-
-Exemples :
-
-- storage.md
-- boot.md
-- security.md
-- desktop.md
-
----
-
-## lib/
-
-Bibliothèque de fonctions.
-
-Chaque fichier correspond à un domaine technique.
-
-Exemples :
+## Séparation observation / intention
 
 ```
-disk.sh      btrfs.sh     luks.sh
-bootloader.sh  mount.sh   users.sh
-commands.sh  logging.sh   validation.sh
+DiskInfo     ← ce que la machine présente
+DiskConfig   ← ce que l'utilisateur demande
 ```
 
-La majorité de ces fichiers sont encore vides.
+Les faits matériels ne sont jamais lus directement : ils passent par un
+`DeviceSource`. `SystemSource` appelle `lsblk` et `findmnt` ; `FixtureSource` lit
+un enregistrement de même forme.
 
-Les fichiers de ce dossier ne doivent jamais être exécutés directement.
+C'est ce qui rend la couche de sécurité testable sans aucun disque, et le menu
+utilisable hors de la machine cible.
 
-Ils sont uniquement importés par les scripts.
+Une installation réelle refuse de démarrer si la source est un enregistrement.
 
 ---
 
-## packages/
-
-Définition des paquets à installer.
-
-Les listes sont séparées par catégories, avec l'extension `.list` : un paquet
-par ligne, sans syntaxe shell.
-
-Exemple :
+## Où se prend la décision de détruire
 
 ```
-base.list
-desktop.list
-development.list
-fonts.list
+menu               → masque les disques inéligibles, avec le motif
+guided.run         → confirmation explicite du nom du disque
+partitioning.guard → refuse, juste avant wipefs
 ```
 
-Les scripts utilisent ces listes pour installer les paquets.
+Les trois existent, mais **seule la troisième compte**. Une configuration peut
+être écrite à la main, copiée d'une machine à l'autre, ou rejouée des mois plus
+tard. La seule vérification qui vaille est celle prise contre le disque tel qu'il
+est au moment d'écrire.
+
+Voir `docs/security.md`.
 
 ---
 
-## tasks/
+## Configuration
 
-Étapes d'installation, numérotées selon leur ordre d'exécution.
+Un document unique, décrit par des modèles pydantic, enregistré en JSON.
+
+Les règles portant sur un seul champ sont sur le champ. Celles qui portent sur
+plusieurs sont sur `InstallConfig` : l'hibernation exige `@swap`, TPM2 exige une
+clé de secours. Celles qui dépendent du matériel observé sont des méthodes
+explicites (`validate_capacity`, `validate_hibernation`), puisqu'elles ont besoin
+d'un fait extérieur au document.
+
+La sérialisation est déterministe : deux machines identiques produisent des
+fichiers identiques, sans quoi l'enregistrement ne vaudrait rien comme artefact de
+reproductibilité.
+
+Les secrets n'y figurent jamais — fichier séparé, `--creds`.
+
+---
+
+## Menu
+
+Les entrées sont des données. Un registre décrit chaque ligne : son libellé,
+comment lire sa valeur courante, comment la modifier, si elle est obligatoire.
+
+Deux rendus parcourent le même registre :
+
+| Rendu | Quand |
+| --- | --- |
+| Textual | terminal interactif, `textual` disponible |
+| Texte simple | sinon, et pour console série, SSH, lecteur d'écran |
+
+`textual` n'est présent sur l'ISO que parce que `archinstall` en dépend : c'est
+une garantie indirecte. Le rendu simple n'est donc pas un repli d'excuse.
+
+Les modifications passent par `Draft`, qui applique le changement sur une copie,
+revalide le document entier, et annule en cas de refus. Modifier champ par champ
+contournerait les règles croisées ou laisserait un modèle invalide.
+
+---
+
+## Étapes d'installation
+
+Onze étapes nommées, enregistrées à mesure, ignorées lors d'une reprise.
 
 ```
-00_environment.sh   40_mount.sh          90_bootloader.sh
-05_disk_selection.sh 50_base_system.sh   95_security.sh
-10_storage.sh       60_configuration.sh  98_cleanup.sh
-20_encryption.sh    70_packages.sh       99_finish.sh
-30_filesystem.sh    80_users.sh
+partition → encrypt → recovery_key → filesystem → mount → base_system
+→ configure → users → bootloader → tpm2 → cleanup
 ```
 
-Chaque étape utilise les fonctions de `lib/` et n'exécute aucune commande
-destructive directement.
+Deux points d'ordre sont des propriétés de sécurité, vérifiées par des tests :
+
+- `recovery_key` avant `tpm2` ;
+- la vérification du disque **dans** `partition`, pas avant.
 
 ---
 
-## templates/
+## Vérification
 
-Modèles de fichiers de configuration écrits dans le système cible : `fstab`,
-`crypttab`, `hostname`, `hosts`, `locale.gen`, `mkinitcpio.conf`,
-`limine.conf`.
+`tests/golden/install-commands.txt` contient la séquence exacte d'une
+installation complète en simulation. Elle fixe les unités et l'ordre des
+arguments, ce qu'aucun autre moyen ne permet sans matériel à détruire.
 
----
-
-## Scripts exécutables
-
-Les scripts exécutables sont situés à la racine du dépôt, pas dans un dossier
-`scripts/`.
-
-- `install.sh` : orchestrateur unique de l'installation
-- `uninstall.sh` : non encore implémenté
-
-Ils utilisent les fonctions présentes dans `lib/`.
+Voir `docs/testing.md`.
 
 ---
 
-## services/
+## Principes
 
-Contient les unités systemd fournies par le projet.
-
-Exemples :
-
-- timers
-- services utilisateur
-- services système
-
----
-
-## tests/ (prévu)
-
-Tests automatiques. Le dossier n'existe pas encore.
-
-Chaque module important possédera ses propres tests.
-
-En attendant, la seule vérification statique disponible est :
-
-```bash
-shellcheck -x install.sh lib/*.sh
-```
-
----
-
-# Flux d'installation
-
-L'installation suit les étapes suivantes :
-
-```
-install.sh
-        │
-        ▼
-Lecture de la configuration
-        │
-        ▼
-Préparation du disque
-        │
-        ▼
-Installation d'Arch Linux
-        │
-        ▼
-Configuration du système
-        │
-        ▼
-Installation du chargeur de démarrage
-        │
-        ▼
-Premier démarrage
-        │
-        ▼
-bootstrap.sh
-        │
-        ▼
-Installation des applications
-        │
-        ▼
-Application des dotfiles
-        │
-        ▼
-Système opérationnel
-```
-
----
-
-# Principes d'architecture
-
-## Une responsabilité par fichier
-
-Chaque script possède une responsabilité unique.
-
-## Une responsabilité par dossier
-
-Les dossiers ne doivent pas mélanger plusieurs domaines.
-
-## Idempotence
-
-Tous les scripts doivent pouvoir être exécutés plusieurs fois sans provoquer d'effets indésirables.
-
-## Lisibilité
-
-Le projet privilégie toujours un code clair à une optimisation prématurée.
-
-## Documentation
-
-Toute décision importante doit être documentée avant d'être implémentée.
-
-## Exécution des commandes
-
-Les scripts ne doivent pas exécuter directement les commandes susceptibles de modifier le système.
-
-Ils doivent passer par une fonction commune chargée de :
-
-* journaliser la commande ;
-* gérer le mode simulation ;
-* détecter les erreurs ;
-* afficher un message compréhensible ;
-* interrompre l’installation en cas d’échec critique.
-
-Cette abstraction permet d’assurer un comportement homogène dans tous les modules.
-
----
-
-# Évolutions futures
-
-L'architecture doit permettre l'ajout de nouveaux modules sans modifier les composants existants.
-
-Exemples :
-
-- nouveau bureau
-- nouveau chargeur de démarrage
-- nouvelle méthode de chiffrement
-- nouvelles applications
-
-Les nouveaux modules doivent s'intégrer naturellement à l'organisation existante.
+- une responsabilité par fichier ;
+- les commentaires expliquent *pourquoi*, jamais *quoi* ;
+- toute opération est idempotente ou reprenable ;
+- documentation en français, code et messages en anglais ;
+- `stdout` ne contient que des données ; la journalisation va sur `stderr`.

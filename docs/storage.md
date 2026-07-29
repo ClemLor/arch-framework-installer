@@ -246,52 +246,66 @@ Les règles suivantes doivent toujours être respectées.
 
 # Configuration centralisée
 
-Les paramètres de stockage ne doivent pas être directement écrits dans les scripts.
+Les paramètres de stockage ne sont jamais écrits en dur dans le code.
 
-Ils sont définis dans un fichier de configuration unique situé dans :
+Ils forment un document unique, décrit par des modèles pydantic
+(`arch_framework/lib/models/`) et enregistré en JSON :
 
-```text
-config/system.conf
+```json
+{
+  "disk": {
+    "target_disk": "/dev/nvme0n1",
+    "efi_size": "1GiB",
+    "filesystem": "btrfs",
+    "compression": "zstd",
+    "compression_level": 3,
+    "subvolumes": ["@", "@home", "@snapshots", "@cache", "@log", "@swap"]
+  },
+  "encryption": {
+    "enabled": true,
+    "mapper_name": "cryptroot",
+    "tpm2_enabled": true,
+    "recovery_key": true
+  },
+  "swap": {
+    "size": "32GiB",
+    "zram_enabled": true,
+    "hibernation_enabled": true
+  }
+}
 ```
 
-Ce fichier constitue la source de vérité de l’installation.
+La sérialisation est déterministe : rejouer ce fichier reconstruit la même
+machine, ce qui est la raison d’être du projet.
 
-Exemple :
+Les valeurs par défaut viennent du profil Framework
+(`arch_framework/profiles/framework.py`) et sont modifiables par le menu guidé.
 
-```bash
-# Disk
-TARGET_DISK="/dev/nvme0n1"
-EFI_SIZE="1GiB"
+Les règles de validation sont placées selon leur portée :
 
-# Encryption
-LUKS_ENABLED="true"
-LUKS_NAME="cryptroot"
-TPM2_ENABLED="true"
+| Portée | Emplacement |
+| --- | --- |
+| Un seul champ | Sur le champ (format de taille, bornes de l’EFI) |
+| Plusieurs champs | Sur `InstallConfig` (hibernation exige `@swap`) |
+| Dépend du matériel observé | Méthode explicite (`validate_capacity`) |
 
-# Filesystem
-FILESYSTEM="btrfs"
-BTRFS_COMPRESSION="zstd"
-BTRFS_COMPRESSION_LEVEL="3"
+La dernière catégorie existe parce qu’une taille de disque minimale ne dit rien
+de ce qu’il reste à la racine une fois le fichier d’échange retiré : un disque de
+64 GiB avec 32 GiB d’échange satisfait le minimum tout en ne laissant que
+31 GiB.
 
-# Memory
-SWAP_SIZE="32GiB"
-ZRAM_ENABLED="true"
-```
-
-Les scripts doivent lire ces valeurs sans modifier le fichier.
-
-Les valeurs par défaut doivent être adaptées au matériel cible, mais peuvent être remplacées avant l’installation.
-
-Les paramètres dangereux, notamment le disque cible, doivent être validés explicitement avant toute opération destructive.
+Le disque cible n’est jamais accepté sur la seule foi de la configuration. La
+vérification est reprise juste avant `wipefs` — voir `docs/security.md`.
 
 ---
 
 # Mode simulation
 
-L’installateur doit fournir un mode simulation accessible avec :
+L’installateur fournit un mode simulation :
 
 ```bash
-./install.sh --dry-run
+python -m arch_framework --install --dry-run --config saved.json
+python -m arch_framework --plan-storage
 ```
 
 Ce mode affiche les opérations prévues sans modifier le système.
@@ -318,23 +332,27 @@ Cela inclut notamment :
 * la modification de la configuration de démarrage ;
 * l’enrôlement TPM2.
 
-Les fonctions potentiellement destructives doivent utiliser une fonction commune d’exécution afin de garantir un comportement cohérent.
+Aucune opération destructive ne contourne `lib/command.py`. L’écriture de fichiers
+dans la cible passe de même par `TargetSystem.write` : écrire `/mnt/etc/fstab` est
+aussi destructeur que `mkfs`, et une simulation ne doit rien créer.
 
-Exemple conceptuel :
+Les valeurs qui n’existent qu’après une étape antérieure — UUID, décalage de
+reprise — sont remplacées par des marqueurs explicites, sinon `fstab`, `crypttab`
+et `limine.conf` seraient rendus vides et donc invérifiables :
 
-```bash
-run_command() {
-    if [[ "${DRY_RUN}" == "true" ]]; then
-        printf '[DRY-RUN] %q ' "$@"
-        printf '\n'
-        return 0
-    fi
-
-    "$@"
-}
+```
+UUID=<UUID-of-/dev/nvme0n1p1>  /boot  vfat  defaults,umask=0077  0 2
 ```
 
-Le mode simulation ne garantit pas que toutes les commandes réussiront sur le système réel. Il permet cependant de vérifier la configuration, l’ordre des opérations et les commandes générées avant l’installation.
+La vérification du disque cible s’applique **aussi** en simulation : répéter une
+opération qui serait refusée n’a pas de sens.
+
+Le mode simulation ne garantit pas que toutes les commandes réussiront sur le
+système réel. Il permet de vérifier la configuration, l’ordre des opérations, les
+unités des arguments et le contenu des fichiers générés.
+
+La séquence complète est par ailleurs figée dans
+`tests/golden/install-commands.txt` — voir `docs/testing.md`.
 
 ---
 
