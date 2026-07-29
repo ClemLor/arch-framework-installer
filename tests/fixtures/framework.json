@@ -93,6 +93,8 @@
   },
   "paths": [
     "/run/archiso",
+    "/run/archiso/bootmnt",
+    "/run/archiso/cowspace",
     "/etc/arch-release",
     "/sys/firmware/efi/efivars"
   ]

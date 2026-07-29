@@ -106,6 +106,14 @@ def test_capacity_rejects_layout_that_starves_root() -> None:
         config.validate_capacity(Size.parse("48GiB"))
 
 
+def test_capacity_reports_a_negative_remainder_readably() -> None:
+    """EFI plus swap can exceed the whole disk. "-4208MiB for root" is not a
+    useful thing to tell someone."""
+    config = override(default_config(), minimum_disk_size="16GiB")
+    with pytest.raises(ConfigError, match="leave nothing for root"):
+        config.validate_capacity(Size.parse("28GiB"))
+
+
 def test_capacity_rejects_unknown_size() -> None:
     with pytest.raises(ConfigError, match="unable to determine"):
         default_config().validate_capacity(Size(0))

@@ -166,6 +166,10 @@ class FixtureSource:
         self._paths: set[str] = set(payload.get("paths") or [])
         self._paths.update(self._files)
         self._paths.update(self._binary)
+        # A mounted path exists by definition. Deriving this rather than
+        # requiring it to be declared twice removes a way to write a fixture
+        # that quietly disagrees with any real machine.
+        self._paths.update(self._mounts)
 
     @classmethod
     def from_file(cls, path: str | Path) -> "FixtureSource":

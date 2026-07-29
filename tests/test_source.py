@@ -92,6 +92,14 @@ def test_declared_files_count_as_existing_paths(framework_source: FixtureSource)
     assert not framework_source.path_exists("/absent")
 
 
+def test_mount_targets_count_as_existing_paths() -> None:
+    """A mounted path exists by definition. Requiring it to be declared twice
+    is a way to write a fixture that disagrees with any real machine — which is
+    exactly how live-medium detection first went undetected."""
+    source = FixtureSource({"mounts": {"/run/archiso/bootmnt": "/dev/sdb1"}})
+    assert source.path_exists("/run/archiso/bootmnt")
+
+
 def test_env_var_selects_the_fixture(monkeypatch) -> None:
     monkeypatch.setenv(FIXTURE_ENV_VAR, str(FIXTURE))
     source = get_source()

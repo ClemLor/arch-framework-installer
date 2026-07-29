@@ -14,10 +14,11 @@ from pathlib import Path
 from . import __version__
 from .lib import log
 from .lib.command import CommandRunner, set_runner
+from .lib.disk import DeviceHandler
 from .lib.disk.source import FixtureSource, set_source
 from .lib.exceptions import InstallerError
 from .lib.hardware import Hardware
-from .lib.models import InstallConfig, Size
+from .lib.models import InstallConfig
 from .profiles import default_config
 
 DEFAULT_CONFIG_PATH = Path.home() / "framework-install.json"
@@ -87,10 +88,9 @@ def load_or_default(path: Path | None) -> InstallConfig:
 
 
 def inspect(config: InstallConfig) -> int:
-    from .lib.disk.source import get_source
-
     hardware = Hardware()
     host = hardware.info()
+    handler = DeviceHandler()
 
     log.section("Host system")
     log.info(f"Environment:       {'Arch live ISO' if host.live_environment else 'other'}")
@@ -102,25 +102,62 @@ def inspect(config: InstallConfig) -> int:
     log.info(f"Secure Boot:       {host.secure_boot}")
     log.info(f"Firmware:          {host.firmware_vendor} {host.firmware_version}")
 
+    log.section("Live installation medium")
+    live_disk = handler.live_medium_disk()
+    if live_disk:
+        log.info(f"Booted from:       {handler.live_medium_source()} on {live_disk}")
+    else:
+        log.info("Booted from:       not detected")
+
     log.section("Block devices")
-    devices = get_source().block_devices()
-    disks = [device for device in devices if device.get("type") == "disk"]
+    disks = handler.disks()
     if not disks:
         log.warn("No disks reported.")
-    for disk in disks:
-        name = disk.get("path") or disk.get("name")
-        raw_size = disk.get("size")
-        size = Size.from_bytes(raw_size).human() if isinstance(raw_size, int) else "Unknown"
-        transport = disk.get("tran") or "unknown"
+    for path in disks:
+        info = handler.info(path)
+        if info is None:
+            continue
+        size = info.size.human() if info.size else "Unknown"
+        # read_only_mode: inspection is allowed to look at mounted disks.
+        verdict = handler.safety(path, read_only_mode=True)
         log.info(
-            f"{name:<16} {size:>10}  {transport:<5} {disk.get('model') or 'Unknown'}"
+            f"{path:<16} {size:>10}  {info.transport:<7} {info.model}"
         )
+        log.info(f"{'':<16} {verdict}")
+
+    log.section("Configured target")
+    verdict = handler.safety(config.disk.target_disk, read_only_mode=True)
+    log.info(f"Target disk:       {config.disk.target_disk}")
+    log.info(f"Safety:            {verdict}")
+
+    target = handler.info(config.disk.target_disk)
+    if target is not None and target.size is not None:
+        try:
+            config.validate_capacity(target.size)
+            log.success(
+                f"Layout fits: root would get "
+                f"{config.root_size_for(target.size).human()}."
+            )
+        except InstallerError as exc:
+            log.warn(str(exc))
+
+    if host.memory is not None:
+        try:
+            config.validate_hibernation(host.memory.bytes)
+        except InstallerError as exc:
+            log.warn(str(exc))
 
     log.section("Configuration")
-    log.info(f"Target disk:       {config.disk.target_disk}")
     log.info(f"Hostname:          {config.system.hostname}")
-    log.info(f"Encryption:        {config.encryption.enabled} (TPM2 {config.encryption.tpm2_enabled})")
-    log.info(f"Swap:              {config.swap.size} (hibernation {config.swap.hibernation_enabled})")
+    log.info(
+        f"Encryption:        {config.encryption.enabled} "
+        f"(TPM2 {config.encryption.tpm2_enabled})"
+    )
+    log.info(
+        f"Swap:              {config.swap.size} "
+        f"(hibernation {config.swap.hibernation_enabled})"
+    )
+    log.info(f"Subvolumes:        {' '.join(config.disk.subvolumes)}")
     log.info(f"Bootloader:        {config.bootloader}")
     log.info(f"Kernels:           {', '.join(config.system.kernels)}")
 

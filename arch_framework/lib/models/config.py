@@ -84,10 +84,13 @@ class InstallConfig(BaseModel):
 
         root = self.root_size_for(disk_size)
         if root < MINIMUM_ROOT_SIZE:
+            # A negative remainder is possible and reads badly as a size, so it
+            # is reported as what it means.
+            left = "nothing" if root.mib <= 0 else f"only {root.human()}"
             raise ConfigError(
                 "the target disk cannot hold the planned layout: "
-                f"{disk_size.human()} disk, {self.disk.efi_size} EFI, "
-                f"{self.swap.size} swap leaves {root} for root, "
+                f"{disk_size.human()} disk, {self.disk.efi_size} EFI and "
+                f"{self.swap.size} swap leave {left} for root, "
                 f"below the {MINIMUM_ROOT_SIZE} floor"
             )
 
