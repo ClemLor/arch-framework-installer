@@ -55,8 +55,8 @@ verify_swapfile() { record_check swapfile; }
 verify_hibernation_configuration() { record_check hibernation; }
 verify_snapshot_configuration() { record_check snapshots; }
 verify_aur_setup() { record_check aur; }
-verify_graphical_session() { record_check graphical; }
-verify_limine() { record_check boot; }
+desktop_verify_system() { record_check graphical; }
+bootloader_verify() { record_check boot; }
 verify_installed_security() { record_check security; }
 
 verify_installation_readiness >/dev/null

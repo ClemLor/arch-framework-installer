@@ -327,13 +327,14 @@ validate_config() {
         has_error="true"
     fi
 
-    if [[ "${BOOTLOADER}" != "limine" ]]; then
-        error "Only Limine is currently supported."
+    # Which implementations exist is lib/provider.sh's business, not this file's.
+    # A hardcoded name here would have to be edited every time one is added, and
+    # would silently disagree with the dispatcher when it was not.
+    if ! validate_bootloader_provider; then
         has_error="true"
     fi
 
-    if [[ "${DESKTOP_COMPOSITOR}" != "niri" ]] || [[ "${DESKTOP_SHELL}" != "dank" ]]; then
-        error "The supported desktop profile is niri with dank."
+    if ! validate_desktop_provider; then
         has_error="true"
     fi
 

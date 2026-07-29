@@ -3,11 +3,28 @@ set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 readonly ROOT
+# shellcheck source=lib/logging.sh
 source "${ROOT}/lib/logging.sh"
+# shellcheck source=lib/common.sh
 source "${ROOT}/lib/common.sh"
+# shellcheck source=lib/commands.sh
 source "${ROOT}/lib/commands.sh"
+# shellcheck source=lib/provider.sh
+source "${ROOT}/lib/provider.sh"
+# shellcheck source=lib/pacstraps.sh
 source "${ROOT}/lib/pacstraps.sh"
+# shellcheck source=lib/packages.sh
 source "${ROOT}/lib/packages.sh"
+# collect_packages asks the chosen bootloader and desktop for their own packages,
+# so the providers have to be present.
+# shellcheck source=lib/bootloader.sh
+source "${ROOT}/lib/bootloader.sh"
+# shellcheck source=lib/desktop.sh
+source "${ROOT}/lib/desktop.sh"
+
+BOOTLOADER="limine"
+DESKTOP_COMPOSITOR="niri"
+DESKTOP_SHELL="dank"
 
 if collect_packages | grep -Fxq nano; then
     printf '%s\n' 'ok - nano is included for TTY recovery'

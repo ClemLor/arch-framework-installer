@@ -1,7 +1,28 @@
 #!/usr/bin/env bash
 
+# ==============================================================================
+# Bootloader: limine
+#
+# Implements the bootloader provider contract from lib/provider.sh:
+#
+#   bootloader_limine_packages
+#   bootloader_limine_install
+#   bootloader_limine_verify
+#
+# Another bootloader is added by writing bootloader_<name>_* here or in its own
+# file and adding the name to SUPPORTED_BOOTLOADERS. Nothing that calls it
+# changes.
+# ==============================================================================
+
 if [[ -n "${ARCH_INSTALLER_BOOTLOADER_LOADED:-}" ]]; then return 0; fi
 readonly ARCH_INSTALLER_BOOTLOADER_LOADED="true"
+
+# Packages this bootloader needs. Declared here rather than in base.list so that
+# swapping the bootloader swaps its packages with it, instead of leaving the old
+# one's behind in a list nobody remembers to edit.
+bootloader_limine_packages() {
+    printf '%s\n' limine
+}
 
 # Resume parameters for hibernation.
 #
@@ -65,7 +86,7 @@ Exec = /usr/local/lib/arch-framework-installer/update-limine-efi
 '
 }
 
-install_limine() {
+bootloader_limine_install() {
     local root_identifier
     local kernel_command_line
     local configuration
@@ -108,7 +129,7 @@ default_entry: 1
     run_in_chroot /usr/local/lib/arch-framework-installer/update-limine-efi
 }
 
-verify_limine() {
+bootloader_limine_verify() {
     local config_path="${MOUNT_ROOT}/boot/limine.conf"
     local efi_source="${MOUNT_ROOT}/usr/share/limine/BOOTX64.EFI"
 

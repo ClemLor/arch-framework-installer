@@ -23,6 +23,14 @@ config_is_valid() {
         source "${ROOT}/lib/common.sh"
         # shellcheck source=lib/commands.sh
         source "${ROOT}/lib/commands.sh"
+        # validate_config asks the providers whether the chosen bootloader and
+        # desktop exist, so the dispatcher and its implementations are needed.
+        # shellcheck source=lib/provider.sh
+        source "${ROOT}/lib/provider.sh"
+        # shellcheck source=lib/bootloader.sh
+        source "${ROOT}/lib/bootloader.sh"
+        # shellcheck source=lib/desktop.sh
+        source "${ROOT}/lib/desktop.sh"
         # shellcheck source=lib/config.sh
         source "${ROOT}/lib/config.sh"
         # /usr/share/zoneinfo does not exist on every development host and is

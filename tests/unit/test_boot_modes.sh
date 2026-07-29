@@ -24,20 +24,20 @@ get_system_partition_path() { printf /dev/mock2; }
 luks_device() { get_system_partition_path; }
 
 LUKS_ENABLED=false
-install_limine
+bootloader_limine_install
 [[ "${CONFIGURATION}" == *'root=PARTUUID=DRY-RUN-PARTUUID'* ]]
 [[ "${CONFIGURATION}" != *'rd.luks.name='* ]]
 printf '%s\n' 'ok - unencrypted Limine entry uses the root PARTUUID'
 
 LUKS_ENABLED=true
 CONFIGURATION=""
-install_limine
+bootloader_limine_install
 [[ "${CONFIGURATION}" == *'rd.luks.name=DRY-RUN-LUKS-UUID=cryptroot'* ]]
 printf '%s\n' 'ok - encrypted Limine entry retains the LUKS mapping'
 
 TPM2_ENABLED=true
 CONFIGURATION=""
-install_limine
+bootloader_limine_install
 [[ "${CONFIGURATION}" == *'rd.luks.options=DRY-RUN-LUKS-UUID=tpm2-device=auto'* ]]
 printf '%s\n' 'ok - TPM2 enrollment is activated from the kernel command line'
 
@@ -63,5 +63,5 @@ printf '/Arch Linux LTS\n    kernel_path: boot():/vmlinuz-linux-lts\n/Arch Linux
 printf 'hook\n' >"${MOUNT_ROOT}/etc/pacman.d/hooks/95-limine-efi.hook"
 printf '#!/usr/bin/env bash\n' >"${MOUNT_ROOT}/usr/local/lib/arch-framework-installer/update-limine-efi"
 chmod 0755 "${MOUNT_ROOT}/usr/local/lib/arch-framework-installer/update-limine-efi"
-verify_limine
+bootloader_limine_verify
 printf '%s\n' 'ok - both kernels and both Limine EFI paths are verified'

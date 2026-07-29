@@ -1,7 +1,29 @@
 #!/usr/bin/env bash
 
+# ==============================================================================
+# Desktop session: niri, with Dank Material Shell
+#
+# Implements the desktop provider contract from lib/provider.sh:
+#
+#   desktop_niri_packages
+#   desktop_niri_configure_system   greetd, tmpfiles, system-level session
+#   desktop_niri_configure_user     the user's own configuration and units
+#   desktop_niri_verify_system
+#   desktop_niri_verify_user
+#
+# Replacing the compositor means adding desktop_<name>_* functions and listing
+# the name in SUPPORTED_COMPOSITORS. The tasks and the readiness checks call
+# through the dispatcher and do not mention niri.
+# ==============================================================================
+
 if [[ -n "${ARCH_INSTALLER_DESKTOP_LOADED:-}" ]]; then return 0; fi
 readonly ARCH_INSTALLER_DESKTOP_LOADED="true"
+
+# Declared by the provider so that swapping the compositor swaps its packages
+# with it. desktop.list still holds what is shared by any graphical session.
+desktop_niri_packages() {
+    printf '%s\n' niri dms-shell-niri greetd
+}
 
 desktop_lock_launcher_path() {
     printf '/home/%s/.local/bin/lock-dms-session' "${USERNAME}"
@@ -23,7 +45,7 @@ desktop_niri_dropin_path() {
     printf '/home/%s/.config/systemd/user/niri.service.d/dms.conf' "${USERNAME}"
 }
 
-configure_graphical_session() {
+desktop_niri_configure_system() {
     local greeter_asset='/usr/share/quickshell/dms/Modules/Greetd/assets/dms-greeter'
     local greetd_config
     local greeter_command="${greeter_asset} --command niri -p /usr/share/quickshell/dms"
@@ -60,7 +82,7 @@ d /var/lib/greeter 0755 greeter greeter -
     run_in_chroot systemctl set-default graphical.target
 }
 
-configure_user_desktop() {
+desktop_niri_configure_user() {
     local launcher_path
     local lock_unit_path
     local niri_config
@@ -129,7 +151,7 @@ ExecStart=${launcher_path}
     run_in_chroot chmod 0755 "${launcher_path}"
 }
 
-verify_graphical_session() {
+desktop_niri_verify_system() {
     if [[ "${DRY_RUN}" == "true" ]]; then
         return 0
     fi
@@ -147,7 +169,7 @@ verify_graphical_session() {
     run_in_chroot systemctl is-enabled greetd.service >/dev/null
 }
 
-verify_user_desktop() {
+desktop_niri_verify_user() {
     local launcher_path
     local lock_unit_path
     local niri_config_path

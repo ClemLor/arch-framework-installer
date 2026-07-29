@@ -63,6 +63,10 @@ source "${SCRIPT_DIR}/lib/btrfs.sh"
 source "${SCRIPT_DIR}/lib/mount.sh"
 # shellcheck source=lib/chroot.sh
 source "${SCRIPT_DIR}/lib/chroot.sh"
+# Dispatch for swappable components. Sourced before the implementations so the
+# contract is defined first; the dispatchers themselves only resolve at call time.
+# shellcheck source=lib/provider.sh
+source "${SCRIPT_DIR}/lib/provider.sh"
 # shellcheck source=lib/pacstraps.sh
 source "${SCRIPT_DIR}/lib/pacstraps.sh"
 # shellcheck source=lib/packages.sh

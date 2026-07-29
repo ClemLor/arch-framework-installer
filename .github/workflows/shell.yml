@@ -49,6 +49,12 @@ jobs:
             source lib/logging.sh
             source lib/common.sh
             source lib/commands.sh
+            # validate_config asks the providers whether the configured
+            # bootloader and desktop are implemented, so both the dispatcher and
+            # the implementations have to be present.
+            source lib/provider.sh
+            source lib/bootloader.sh
+            source lib/desktop.sh
             source lib/config.sh
             validate_timezone() { return 0; }
             load_config

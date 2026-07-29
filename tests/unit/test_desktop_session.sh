@@ -29,7 +29,7 @@ project_root() { printf '%s' "${ROOT}"; }
 # shellcheck source=lib/desktop.sh
 source "${ROOT}/lib/desktop.sh"
 
-configure_graphical_session
+desktop_niri_configure_system
 [[ "${COMMANDS}" == *'test -x /usr/share/quickshell/dms/Modules/Greetd/assets/dms-greeter'* ]]
 [[ "${WRITES}" == *'PATH:/etc/greetd/config.toml'* ]]
 [[ "${WRITES}" == *'[initial_session]'* ]]
@@ -46,7 +46,7 @@ printf '%s\n' 'ok - greetd auto-login starts niri-session with the DMS greeter a
 
 WRITES=''
 COMMANDS=''
-configure_user_desktop
+desktop_niri_configure_user
 [[ "${COMMANDS}" == *'test -f /usr/lib/systemd/user/dms.service'* ]]
 [[ "${WRITES}" == *'PATH:/home/alice/.config/niri/config.kdl'* ]]
 [[ "${WRITES}" == *'XDG_CURRENT_DESKTOP "niri"'* ]]
@@ -68,7 +68,7 @@ printf '%s\n' 'ok - niri starts the official DMS service and locks fail-closed'
 WRITES=''
 COMMANDS=''
 DMS_LOCK_ON_START="false"
-configure_user_desktop
+desktop_niri_configure_user
 [[ "${WRITES}" == *'niri.service.d/dms.conf'* ]]
 [[ "${WRITES}" != *'dms-lock-on-start.service'* ]]
 [[ "${WRITES}" != *'dms ipc call lock lock'* ]]

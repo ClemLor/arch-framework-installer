@@ -75,7 +75,7 @@ verify_installed_user() {
     run_in_chroot id "${USERNAME}" >/dev/null || return 1
     verify_installed_user_home || return 1
     run_in_chroot visudo -cf /etc/sudoers.d/10-wheel >/dev/null || return 1
-    verify_user_desktop
+    desktop_verify_user
 }
 
 verify_installed_security() {
@@ -112,7 +112,7 @@ verify_installation_readiness() {
     verify_readiness_check "hibernation is wired end to end" verify_hibernation_configuration || return 1
     verify_readiness_check "snapshots and rollback are configured" verify_snapshot_configuration || return 1
     verify_readiness_check "AUR software can be installed after reboot" verify_aur_setup || return 1
-    verify_readiness_check "the graphical login is configured" verify_graphical_session || return 1
-    verify_readiness_check "Limine and boot artifacts are complete" verify_limine || return 1
+    verify_readiness_check "the graphical login is configured" desktop_verify_system || return 1
+    verify_readiness_check "the bootloader and boot artifacts are complete" bootloader_verify || return 1
     verify_readiness_check "the storage security profile is valid" verify_installed_security
 }

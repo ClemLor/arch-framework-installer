@@ -24,13 +24,13 @@ $(swapfile_fstab_entry)" || return 1
 " || return 1
     configure_zram || return 1
     configure_snapper || return 1
-    configure_graphical_session
+    desktop_configure_system
 }
 task_configuration_verify() {
     verify_target_file /etc/fstab &&
         verify_target_file /etc/hostname &&
         verify_zram_configuration &&
-        verify_graphical_session
+        desktop_verify_system
 }
 # Hibernation cannot be verified here: resume_offset lands in limine.conf, which
 # the bootloader task writes afterwards. It is checked in the readiness task.
