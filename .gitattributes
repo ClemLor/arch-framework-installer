@@ -1,0 +1,16 @@
+# Shell scripts must reach the ISO with LF endings. A CRLF shebang or function
+# body fails with `$'\r': command not found`, which reads as a corrupt script
+# rather than a line-ending problem — and it only shows up on the machine you
+# were about to install.
+* text=auto eol=lf
+
+*.sh    text eol=lf
+*.py    text eol=lf
+*.conf  text eol=lf
+*.list  text eol=lf
+*.kdl   text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+
+# Written into the target system verbatim.
+templates/* text eol=lf
