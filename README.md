@@ -8,8 +8,10 @@ LUKS2/TPM2, Btrfs, Limine et un bureau Niri + Dank Material Shell.
 ### Menu guidé
 
 ```bash
-python3 -m configurator          # configurer, puis Save ou Install
+python3 -m configurator          # interface plein écran, puis Save ou Install
+python3 -m configurator --text   # invites simples, scriptables
 python3 -m configurator --show   # état courant et problèmes, sans rien modifier
+python3 -m configurator --dry-run  # Install suit la simulation des 15 tâches à l'écran
 ```
 
 Le menu écrit `config/generated.conf`, que `install.sh` charge après

@@ -34,7 +34,14 @@ bash tests/unit/test_user_configuration.sh
 bash tests/unit/test_services.sh
 bash tests/unit/test_readiness.sh
 bash tests/unit/test_vm_validator.sh
+bash tests/unit/test_events.sh
 ```
+
+`test_events.sh` compare la sortie humaine de deux exécutions identiques, l'une
+avec `AFI_EVENT_FD` et l'autre sans, par un `diff` : c'est le seul contrôle qui
+teste réellement « identique octet pour octet ». Il vérifie aussi qu'un lecteur
+disparu n'interrompt pas l'installation, et qu'un échec dans `execute` suivi d'un
+`cleanup` en échec rapporte bien `execute`.
 
 Le configurateur Python a sa propre suite, bibliothèque standard uniquement —
 l'ISO ne fournit pas pytest, et une suite qui ne peut pas y tourner cesse d'être
@@ -42,6 +49,30 @@ exécutée :
 
 ```bash
 python3 -m unittest discover -s tests/python
+```
+
+Trois niveaux, du plus portable au plus exigeant :
+
+| Fichier | Ce qu'il couvre | Exigences |
+| --- | --- | --- |
+| `test_prompts.py`, `test_editors.py` | les vrais éditeurs de `build_menu()`, pilotés par un dos scripté | aucune |
+| `test_tui_layout.py`, `test_tui_install_layout.py` | tout ce que l'interface décide : lignes, troncature, défilement, champ de saisie | aucune |
+| `test_events.py`, `test_runner_model.py` | protocole et modèle, à partir d'enregistrements écrits à la main | aucune |
+| `test_runner_process.py` | vrais sous-processus et vrais tubes, contre de faux installateurs | POSIX + bash |
+| `test_tui_screen.py` | correspondance touche → symbole | `_curses` |
+| `test_tui_pty.py` | une session complète sur pseudo-terminal | `AFI_TUI_PTY=1` |
+
+Le découpage n'est pas cosmétique : `_curses` manque sur un interpréteur Python
+sans lui — toute build Windows, toute build minimale — et `unittest discover`
+importe tous les modules de test. Aucun `import curses` au niveau module en dehors de
+`tui/{term,screen,app,install}.py`, et les couches curses se construisent sous WSL
+ou en VM. `test_tui_pty.py` est explicitement désactivé par défaut : un test de
+terminal qui devient instable en CI finit désactivé puis supprimé, et sa valeur
+réelle est déjà couverte sans terminal.
+
+```bash
+AFI_TUI_PTY=1 python3 -m unittest tests.python.test_tui_pty
+AFI_TUI_ASCII=1 python3 -m configurator      # jeu ASCII, pour une console sans police complète
 ```
 
 Les tests d'intégration sur loop device exigent un environnement isolé dédié.

@@ -16,9 +16,32 @@ l'installateur à ses valeurs par défaut.
 ## Menu guidé
 
 ```bash
-python3 -m configurator                 # menu, puis Save ou Install
+python3 -m configurator                 # interface plein écran, puis Save ou Install
+python3 -m configurator --text          # invites simples, scriptables
 python3 -m configurator --show          # état courant et problèmes, sans rien modifier
+python3 -m configurator --dry-run       # Install suit la simulation à l'écran
 ```
+
+L'interface plein écran (`configurator/tui/`) est choisie dès que le terminal s'y
+prête : `curses` disponible, `TERM` utilisable, entrée et sortie sur un terminal.
+Sinon — ou avec `--text`, ou `AFI_NO_TUI=1` — ce sont les invites simples, ligne
+par ligne, qui restent la voie scriptable et testable.
+
+| Touche | Effet |
+| --- | --- |
+| `↑` `↓` (ou `k` `j`) | déplacer la sélection |
+| `Entrée` | modifier le réglage sélectionné |
+| `Échap` | abandonner la question courante (équivaut à `:q` en mode texte) |
+| `s` / `i` | enregistrer / installer |
+| `q` | quitter sans rien écrire |
+
+Les deux interfaces posent les **mêmes** questions : les éditeurs de
+`configurator/menu.py` sont partagés, et seul le dos — `configurator/prompts.py` —
+change. Une règle ajoutée dans `constraints.py` se voit donc dans les deux, sans
+second endroit à mettre à jour.
+
+`AFI_TUI_ASCII=1` force le jeu de caractères ASCII, pour une console dont la
+police ne rend pas `… ✔ ✘`.
 
 Le configurateur **n'installe rien**. Il écrit `config/generated.conf` puis, si
 vous choisissez Install, passe la main à `install.sh` par `exec`. Toute opération
@@ -28,6 +51,38 @@ réel devant lui.
 
 Il n'utilise que la bibliothèque standard : aucune dépendance à installer sur
 l'ISO.
+
+### Suivi d'une simulation à l'écran
+
+Avec `--dry-run`, Install garde l'écran et affiche les 15 tâches de `tasks/` en
+train de s'exécuter : phase courante, durée, échec et rollback, plus la sortie
+brute de l'installateur en bas.
+
+```
+ Arch Framework Installer — dry run   1/15
+ ✔ [01/15] Environment ................ 1s
+ > [02/15] Disk selection ............. validate
+   [03/15] GPT partitioning ..........
+ ─────────────────────────────────────────────
+ [02/15] Disk selection           …
+ Disk selection: validate
+ c interrupt   ^v scroll the log
+```
+
+Une **installation réelle**, elle, continue de passer la main au terminal comme
+avant. `install.sh` y pose cinq questions — chemin du disque à retaper deux fois,
+phrase de passe LUKS, mots de passe root et utilisateur — et une interface plein
+écran ne peut pas partager un terminal avec un enfant qui interroge l'utilisateur.
+Les rendre non interactives voudrait dire réécrire `lib/luks.sh`, `lib/users.sh` et
+`lib/ui.sh`, c'est-à-dire le chemin le plus dangereux du projet ; ce n'est pas fait
+ici. En simulation ces cinq questions sont déjà sautées (`tasks/10_storage.sh`,
+`tasks/20_encryption.sh`, `lib/users.sh`, et `run_command` qui n'exécute rien),
+d'où le périmètre retenu.
+
+`c` demande confirmation puis envoie `SIGINT` au groupe de processus : le trap de
+`lib/task.sh` s'exécute, le nettoyage et le rollback ont lieu, et la simulation se
+termine par 130. Quitter en cours de route n'est pas proposé — cela laisserait un
+processus root installer sans personne pour regarder.
 
 ### Verrouillage des options incompatibles
 
