@@ -72,10 +72,29 @@ absence produit des instabilités qui ressemblent à des bogues logiciels.
 Présents dans le système installé et pas seulement dans l'ISO. Un démarrage cassé
 ne peut pas être réparé depuis son propre shell si les outils n'y sont pas.
 
-### `iwd` plutôt que `wpa_supplicant`
+### `iwd` plutôt que `wpa_supplicant`, et pas de `dhcpcd`
 
 Moins de pièces mobiles pour un portable qui ne rejoint que des réseaux
 WPA2/WPA3.
+
+Le partage des rôles est explicite :
+
+| Composant | Rôle |
+| --- | --- |
+| `iwd` | authentification sans fil uniquement |
+| `systemd-networkd` | adresses et DHCP, filaire et sans fil |
+| `systemd-resolved` | résolution DNS |
+
+`iwd` sait faire son propre DHCP, et `dhcpcd` aussi. Les activer en plus de
+`systemd-networkd` mettrait deux clients en concurrence sur la même interface, et
+le comportement réseau du premier démarrage dépendrait de celui qui gagne.
+
+`EnableNetworkConfiguration=false` est écrit explicitement dans
+`/etc/iwd/main.conf` plutôt que de s'appuyer sur la valeur par défaut, pour que la
+répartition reste visible.
+
+Le métrique de route est plus élevé sur le sans-fil que sur le filaire : une
+machine sur station d'accueil préfère le câble.
 
 ### `snapper`
 

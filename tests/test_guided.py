@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -122,3 +123,95 @@ def test_a_broken_config_is_reported_not_raised(tmp_path: Path) -> None:
     broken = tmp_path / "broken.json"
     broken.write_text("{ not json", encoding="utf-8")
     assert main(["--inspect", "--config", str(broken)]) == 1
+
+
+# -- unattended replay ------------------------------------------------------
+
+
+def write_pair(tmp_path: Path) -> tuple[Path, Path]:
+    config_path = tmp_path / "saved.json"
+    creds_path = tmp_path / "creds.json"
+
+    payload = default_config().model_dump(mode="json")
+    payload["users"]["users"] = [
+        {"name": "clement", "sudo": True, "shell": "/usr/bin/fish", "groups": []}
+    ]
+    InstallConfig.model_validate(payload).save(config_path)
+
+    creds_path.write_text(
+        json.dumps(
+            {
+                "user_passwords": {"clement": "secret"},
+                "encryption_passphrase": "passphrase",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return config_path, creds_path
+
+
+def test_unattended_dry_run_from_config_and_creds(
+    tmp_path: Path, with_fixture_devices
+) -> None:
+    """The flow a user hits first when replaying a saved configuration: no menu,
+    no prompts, secrets from a file."""
+    config_path, creds_path = write_pair(tmp_path)
+
+    assert (
+        main(
+            [
+                "--install",
+                "--dry-run",
+                "--config",
+                str(config_path),
+                "--creds",
+                str(creds_path),
+            ]
+        )
+        == 0
+    )
+
+
+def test_unattended_run_reports_a_missing_creds_file(
+    tmp_path: Path, with_fixture_devices
+) -> None:
+    config_path, _ = write_pair(tmp_path)
+
+    assert (
+        main(
+            [
+                "--install",
+                "--dry-run",
+                "--config",
+                str(config_path),
+                "--creds",
+                str(tmp_path / "absent.json"),
+            ]
+        )
+        == 1
+    )
+
+
+def test_creds_file_missing_a_user_password_is_refused(
+    tmp_path: Path, with_fixture_devices
+) -> None:
+    """An account with no password is created unable to log in, so this is caught
+    before anything is written."""
+    config_path, creds_path = write_pair(tmp_path)
+    creds_path.write_text(
+        json.dumps({"encryption_passphrase": "passphrase"}), encoding="utf-8"
+    )
+
+    assert (
+        main(
+            [
+                "--install",
+                "--dry-run",
+                "--config",
+                str(config_path),
+                "--creds",
+                str(creds_path),
+            ]
+        )
+        == 1
+    )

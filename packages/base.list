@@ -18,9 +18,13 @@ mkinitcpio
 
 # Networking. iwd rather than wpa_supplicant: fewer moving parts for a laptop
 # that only joins WPA2/WPA3 networks.
+#
+# No dhcpcd. iwd can do its own DHCP and systemd-networkd does DHCP for every
+# link, so running both means two clients competing for the same interface and a
+# first boot whose network behaviour depends on which one wins. Address
+# configuration is systemd-networkd's job alone; iwd only authenticates.
 systemd-resolvconf
 iwd
-dhcpcd
 
 # Recovery essentials. A system you cannot edit from a TTY is a system you
 # reinstall instead of repairing.

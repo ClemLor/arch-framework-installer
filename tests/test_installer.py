@@ -137,6 +137,49 @@ def test_partitioning_precedes_everything_destructive(installed) -> None:
     assert runner.journal[0][0] == "wipefs"
 
 
+def test_vconsole_is_written_before_the_initramfs_is_built(installed) -> None:
+    """sd-vconsole reads /etc/vconsole.conf at build time. A keymap that lands
+    afterwards means a passphrase prompt in the wrong layout — the failure
+    boot.md documents and nothing else would catch."""
+    installer, runner = installed
+    installer.run()
+
+    assert any(path.endswith("etc/vconsole.conf") for path in installer.target.written)
+
+    # configure.apply writes every file, then runs the commands that consume
+    # them, so pinning the build after locale-gen pins it after the writes too.
+    build, locale_gen = (
+        next(
+            index
+            for index, argv in enumerate(runner.journal)
+            if needle in " ".join(argv)
+        )
+        for needle in ("mkinitcpio --allpresets", "locale-gen")
+    )
+    assert locale_gen < build
+
+
+def test_only_one_dhcp_client_is_enabled(installed) -> None:
+    """iwd and dhcpcd both do DHCP. Enabling both makes the first boot's network
+    behaviour depend on which one wins the interface."""
+    installer, runner = installed
+    installer.run()
+
+    enabled = [
+        argv[-1] for argv in runner.journal if "systemctl" in argv and "enable" in argv
+    ]
+    assert "dhcpcd" not in enabled
+    assert "systemd-networkd" in enabled
+    assert "iwd" in enabled
+
+    iwd_config = next(
+        content
+        for path, content in installer.target.written.items()
+        if path.endswith("etc/iwd/main.conf")
+    )
+    assert "EnableNetworkConfiguration=false" in iwd_config
+
+
 # -- sgdisk units -----------------------------------------------------------
 
 
