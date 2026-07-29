@@ -1,5 +1,9 @@
 base
+# base-devel provides makepkg and the toolchain every AUR build needs.
 base-devel
+# Needed to clone the paru PKGBUILD. Without it afi-aur-setup cannot bootstrap
+# an AUR helper at all.
+git
 btrfs-progs
 cryptsetup
 dosfstools

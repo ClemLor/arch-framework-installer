@@ -67,6 +67,9 @@ source "${SCRIPT_DIR}/lib/chroot.sh"
 source "${SCRIPT_DIR}/lib/pacstraps.sh"
 # shellcheck source=lib/packages.sh
 source "${SCRIPT_DIR}/lib/packages.sh"
+# Sourced after pacstraps.sh: it uses read_package_list from there.
+# shellcheck source=lib/aur.sh
+source "${SCRIPT_DIR}/lib/aur.sh"
 # shellcheck source=lib/services.sh
 source "${SCRIPT_DIR}/lib/services.sh"
 # shellcheck source=lib/desktop.sh

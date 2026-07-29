@@ -1,5 +1,66 @@
 # Paquets
 
+## AUR
+
+Aucun paquet AUR n'est installé pendant l'installation.
+
+Trois raisons, pas une préférence :
+
+- l'ISO live n'a ni environnement de compilation ni utilisateur non privilégié ;
+- `makepkg` refuse de s'exécuter en root, et le contourner laisserait des
+  fichiers appartenant à root dans l'arbre de compilation ;
+- un PKGBUILD cassé — tarball déplacé, somme de contrôle changée — est courant.
+  Pendant l'installation, cela ferait échouer une tâche et déclencherait le
+  rollback d'un système par ailleurs complet et amorçable.
+
+L'installateur écrit donc un script, exécuté une fois après le premier
+démarrage :
+
+```bash
+afi-aur-setup
+```
+
+Il construit `paru` depuis son PKGBUILD, puis installe la liste enregistrée dans
+`/usr/local/share/arch-framework-installer/aur.list`. La liste est copiée dans le
+système cible parce que le dépôt n'est plus disponible après le redémarrage.
+
+Le script :
+
+- refuse de s'exécuter en root ;
+- demande l'accès `sudo` une fois au départ, plutôt qu'au milieu d'une longue
+  compilation où une invite expirée l'abandonnerait ;
+- installe les paquets **un par un**. Un seul `--needed` groupé abandonne tout
+  l'ensemble dès qu'un PKGBUILD est cassé, ce qui laisserait la majorité de la
+  liste non installée ;
+- est réexécutable : il ignore ce qui est déjà installé. C'est nécessaire, la
+  première compilation cassée arrivera.
+
+Les échecs sont listés à la fin et le script sort en erreur, sans empêcher les
+autres paquets de s'installer.
+
+### Contenu
+
+| Paquet | Note |
+| --- | --- |
+| `librewolf-bin` | Firefox sans télémétrie |
+| `microsoft-edge-stable-bin` | |
+| `visual-studio-code-bin` | build Microsoft, **pas** `code` |
+| `cursor-bin` | |
+
+`visual-studio-code-bin` et `code` (dépôt extra) ne sont pas interchangeables :
+seul le premier accède au Marketplace Microsoft, donc à Copilot, Pylance et aux
+extensions Remote. Le second utilise Open VSX.
+
+`paru` ne figure pas dans la liste : c'est lui qui l'installe.
+
+### Prérequis
+
+`git`, `base-devel` et `sudo` sont dans `base.list` précisément pour que ce
+script puisse fonctionner. La vérification finale refuse l'installation s'ils
+manquent — le découvrir après un redémarrage serait pire.
+
+---
+
 Les fichiers `packages/*.list` sont lus par `lib/pacstraps.sh`, nettoyés de leurs
 commentaires, fusionnés et triés avant un unique appel à `pacstrap`. Les groupes
 sont base, firmware, Framework, desktop, développement, fontes, multimédia et
@@ -20,10 +81,10 @@ Avant toute écriture disque, l'installateur rafraîchit les bases pacman et
 vérifie avec `pacman --sync --info` que chaque paquet destiné à `pacstrap` est
 disponible. Une faute de nom arrête donc l'installation avant le partitionnement.
 
-`packages/aur.list` est une liste documentaire distincte. Elle contient
-notamment LibreWolf et Microsoft Edge, qui ne sont jamais transmis à `pacstrap`.
-Leurs PKGBUILDs doivent être vérifiés puis construits comme utilisateur non-root
-après le premier démarrage.
+`packages/aur.list` n'est plus une simple liste documentaire : elle est copiée
+dans le système cible et consommée par `afi-aur-setup` après le premier
+démarrage. Elle n'est jamais transmise à `pacstrap`. Voir la section AUR en tête
+de ce document.
 
 Le paquet Arch fournissant le générateur systemd pour zram s'appelle
 `zram-generator` (le projet amont est nommé systemd/zram-generator).

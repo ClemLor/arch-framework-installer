@@ -28,6 +28,16 @@ sudo ./install.sh --plan-storage --config config/system.conf
 sudo ./install.sh --dry-run --verbose
 ```
 
+### Après le premier démarrage
+
+```bash
+afi-aur-setup
+```
+
+Construit `paru`, puis installe les paquets AUR configurés (LibreWolf, Edge,
+VS Code, Cursor). Séparé de l'installation parce qu'un PKGBUILD cassé ne doit pas
+pouvoir faire échouer un système déjà amorçable. Réexécutable.
+
 Une installation réelle exige aussi `ENABLE_REAL_INSTALLATION=true` dans une
 configuration explicitement revue. Le disque complet doit ensuite être saisi
 lors des confirmations destructives. Commencer par [la documentation de

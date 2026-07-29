@@ -54,12 +54,13 @@ verify_zram_configuration() { record_check zram; }
 verify_swapfile() { record_check swapfile; }
 verify_hibernation_configuration() { record_check hibernation; }
 verify_snapshot_configuration() { record_check snapshots; }
+verify_aur_setup() { record_check aur; }
 verify_graphical_session() { record_check graphical; }
 verify_limine() { record_check boot; }
 verify_installed_security() { record_check security; }
 
 verify_installation_readiness >/dev/null
-[[ "${CALLS}" == 'mounts core packages services user zram swapfile hibernation snapshots graphical boot security ' ]]
+[[ "${CALLS}" == 'mounts core packages services user zram swapfile hibernation snapshots aur graphical boot security ' ]]
 printf '%s\n' 'ok - final readiness runs every critical check before cleanup'
 
 CALLS=""

@@ -111,6 +111,7 @@ verify_installation_readiness() {
     verify_readiness_check "the swapfile is usable" verify_swapfile || return 1
     verify_readiness_check "hibernation is wired end to end" verify_hibernation_configuration || return 1
     verify_readiness_check "snapshots and rollback are configured" verify_snapshot_configuration || return 1
+    verify_readiness_check "AUR software can be installed after reboot" verify_aur_setup || return 1
     verify_readiness_check "the graphical login is configured" verify_graphical_session || return 1
     verify_readiness_check "Limine and boot artifacts are complete" verify_limine || return 1
     verify_readiness_check "the storage security profile is valid" verify_installed_security

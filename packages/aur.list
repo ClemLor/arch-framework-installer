@@ -1,4 +1,22 @@
-# Packages intentionally excluded from pacstrap.
-# Review their PKGBUILDs and install them as an unprivileged user after reboot.
+# Packages from the AUR, installed after the first boot by afi-aur-setup.
+#
+# Deliberately excluded from pacstrap: the AUR needs a build environment and an
+# unprivileged user, neither of which exists in the live ISO, and a failed build
+# must never leave a half-installed system behind.
+#
+# paru is not listed here. It is the helper that installs this list, so it is
+# bootstrapped separately from its own PKGBUILD.
+#
+# Review the PKGBUILDs before trusting them. One package per line.
+
+# Browsers
 librewolf-bin
 microsoft-edge-stable-bin
+
+# Editors.
+#
+# visual-studio-code-bin is Microsoft's build, not the OSS `code` package in
+# extra. The difference is not cosmetic: only this one can use the Microsoft
+# Marketplace, so Copilot, Pylance and the Remote extensions work.
+visual-studio-code-bin
+cursor-bin
