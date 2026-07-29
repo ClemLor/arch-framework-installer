@@ -3,19 +3,43 @@
 if [[ -n "${ARCH_INSTALLER_BOOTLOADER_LOADED:-}" ]]; then return 0; fi
 readonly ARCH_INSTALLER_BOOTLOADER_LOADED="true"
 
+# Resume parameters for hibernation.
+#
+# Both are required. resume= alone tells the kernel which device holds the image
+# but not where in it, and the kernel then silently performs a cold boot instead
+# of reporting a problem.
+limine_resume_parameters() {
+    local resume_device="$1"
+    local resume_offset
+
+    hibernation_enabled || return 0
+
+    resume_offset="$(get_swapfile_resume_offset)" || return 1
+    [[ -n "${resume_offset}" ]] || {
+        error "Unable to determine the swapfile resume offset."
+        return 1
+    }
+
+    printf ' resume=%s resume_offset=%s' "${resume_device}" "${resume_offset}"
+}
+
 limine_kernel_command_line() {
     local root_identifier="$1"
+    local resume_device
 
     if [[ "${LUKS_ENABLED}" == "true" ]]; then
+        resume_device="/dev/mapper/${LUKS_NAME}"
         printf 'rd.luks.name=%s=%s ' "${root_identifier}" "${LUKS_NAME}"
         if [[ "${TPM2_ENABLED}" == "true" ]]; then
             printf 'rd.luks.options=%s=tpm2-device=auto ' "${root_identifier}"
         fi
-        printf 'root=/dev/mapper/%s rootflags=subvol=@ rw' "${LUKS_NAME}"
+        printf 'root=%s rootflags=subvol=@ rw' "${resume_device}"
+        limine_resume_parameters "${resume_device}"
         return
     fi
 
     printf 'root=PARTUUID=%s rootflags=subvol=@ rw' "${root_identifier}"
+    limine_resume_parameters "$(get_system_partition_path)"
 }
 
 configure_limine_efi_updates() {

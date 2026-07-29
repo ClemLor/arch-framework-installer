@@ -3,6 +3,9 @@ base-devel
 btrfs-progs
 cryptsetup
 dosfstools
+# chattr and lsattr, used to keep copy-on-write off the swapfile. Needed in the
+# installed system too, or the attribute cannot be checked after a reboot.
+e2fsprogs
 gptfdisk
 jq
 linux

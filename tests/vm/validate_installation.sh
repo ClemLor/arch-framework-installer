@@ -5,13 +5,15 @@ TARGET_USERNAME=""
 ENCRYPTION_PROFILE=""
 TPM2_PROFILE=""
 ZRAM_PROFILE=""
+HIBERNATION_PROFILE=""
 FAILURES=0
 
 usage() {
     cat <<'EOF'
 Usage: sudo ./tests/vm/validate_installation.sh \
   --user USER --encryption enabled|disabled \
-  --tpm2 enabled|disabled --zram enabled|disabled
+  --tpm2 enabled|disabled --zram enabled|disabled \
+  --hibernation enabled|disabled
 
 Run this read-only smoke test after rebooting the installed VM.
 EOF
@@ -40,6 +42,11 @@ parse_arguments() {
                 ZRAM_PROFILE="$2"
                 shift 2
                 ;;
+            --hibernation)
+                [[ $# -ge 2 ]] || return 1
+                HIBERNATION_PROFILE="$2"
+                shift 2
+                ;;
             --help)
                 usage
                 exit 0
@@ -58,6 +65,7 @@ validate_arguments() {
     [[ "${ENCRYPTION_PROFILE}" == "enabled" || "${ENCRYPTION_PROFILE}" == "disabled" ]] || return 1
     [[ "${TPM2_PROFILE}" == "enabled" || "${TPM2_PROFILE}" == "disabled" ]] || return 1
     [[ "${ZRAM_PROFILE}" == "enabled" || "${ZRAM_PROFILE}" == "disabled" ]] || return 1
+    [[ "${HIBERNATION_PROFILE}" == "enabled" || "${HIBERNATION_PROFILE}" == "disabled" ]] || return 1
     [[ "${ENCRYPTION_PROFILE}" == "enabled" || "${TPM2_PROFILE}" == "disabled" ]] || {
         printf 'TPM2 cannot be enabled when encryption is disabled.\n' >&2
         return 1
@@ -81,7 +89,7 @@ require_validation_commands() {
     # Only list tools required to run the validator itself. Desktop programs
     # such as niri are part of the installation under test and must produce a
     # failed check without aborting the remaining diagnostics.
-    for command_name in cmp cryptsetup find findmnt grep id jq lsblk pacman pgrep runuser swapon systemctl; do
+    for command_name in btrfs cmp cryptsetup find findmnt grep id jq lsattr lsblk pacman pgrep runuser swapon systemctl; do
         command -v "${command_name}" >/dev/null || {
             printf 'Missing validation command: %s\n' "${command_name}" >&2
             return 1
@@ -159,6 +167,80 @@ validate_zram_profile() {
         [[ "${ZRAM_PROFILE}" == "disabled" && "${zram_active}" == "false" ]]
 }
 
+# An active zram device is not the same as a used one. With the default
+# swappiness of 60 — tuned for swap on a disk — the kernel reclaims page cache
+# instead of paging to zram, so zram shows up in swapon and stays empty. That is
+# the failure this checks for, and the reason the sysctl drop-in exists.
+validate_zram_tuning() {
+    local swappiness
+
+    [[ "${ZRAM_PROFILE}" == "enabled" ]] || return 0
+
+    swappiness="$(cat /proc/sys/vm/swappiness)" || return 1
+    (( swappiness >= 100 )) || {
+        printf 'vm.swappiness is %s; zram will be largely unused.\n' \
+            "${swappiness}" >&2
+        return 1
+    }
+
+    [[ "$(cat /proc/sys/vm/page-cluster)" == "0" ]]
+}
+
+# zram must outrank the swapfile. At equal priority the kernel stripes across
+# both, which puts hot pages on disk and leaves the swapfile too fragmented to be
+# reserved for a hibernation image.
+validate_swap_priorities() {
+    local zram_priority
+    local file_priority
+
+    swapon --show --json >/dev/null || return 1
+
+    zram_priority="$(swapon --show --json |
+        jq -r 'first(.swapdevices[]? | select(.name | startswith("/dev/zram")) | .prio) // empty')"
+    file_priority="$(swapon --show --json |
+        jq -r 'first(.swapdevices[]? | select(.type == "file") | .prio) // empty')"
+
+    # Nothing to compare unless both exist.
+    [[ -n "${zram_priority}" ]] || return 0
+    [[ -n "${file_priority}" ]] || return 0
+
+    (( zram_priority > file_priority ))
+}
+
+validate_hibernation_profile() {
+    local offset
+
+    if [[ "${HIBERNATION_PROFILE}" != "enabled" ]]; then
+        ! grep -Eq '(^|[[:space:]])resume=' /proc/cmdline
+        return
+    fi
+
+    swapon --show --json |
+        jq --exit-status 'any(.swapdevices[]?; .type == "file")' >/dev/null || {
+        printf 'Hibernation is expected but no file-backed swap is active.\n' >&2
+        return 1
+    }
+
+    grep -Eq '(^|[[:space:]])resume=' /proc/cmdline || return 1
+
+    # resume= without resume_offset= makes the kernel cold-boot silently, so the
+    # presence of both is what actually matters.
+    grep -Eq '(^|[[:space:]])resume_offset=[0-9]+' /proc/cmdline || {
+        printf 'resume= is present but resume_offset= is missing or malformed.\n' >&2
+        return 1
+    }
+
+    offset="$(btrfs inspect-internal map-swapfile --resume-offset /swap/swapfile)" || return 1
+    grep -Eq "(^|[[:space:]])resume_offset=${offset}([[:space:]]|\$)" /proc/cmdline || {
+        printf 'resume_offset does not match the current swapfile offset (%s).\n' \
+            "${offset}" >&2
+        return 1
+    }
+
+    # A copy-on-write swapfile corrupts.
+    lsattr -d /swap/swapfile | grep -q 'C'
+}
+
 validate_user_desktop() {
     local niri_config="/home/${TARGET_USERNAME}/.config/niri/config.kdl"
     local niri_dropin="/home/${TARGET_USERNAME}/.config/systemd/user/niri.service.d/dms.conf"
@@ -219,6 +301,9 @@ main() {
     record_check "system services and graphical target are ready" validate_services
     record_check "the configured user has an active Niri/DMS session" validate_user_desktop
     record_check "zram matches the selected profile" validate_zram_profile
+    record_check "the kernel is tuned to actually use zram" validate_zram_tuning
+    record_check "zram outranks the swapfile" validate_swap_priorities
+    record_check "hibernation matches the selected profile" validate_hibernation_profile
 
     if (( FAILURES > 0 )); then
         printf '%d post-boot validation check(s) failed.\n' "${FAILURES}" >&2

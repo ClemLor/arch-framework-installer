@@ -17,6 +17,15 @@ mount_target_filesystems() {
     run_command mount -o "${options},subvol=@snapshots" "${device}" "${MOUNT_ROOT}/.snapshots" || return 1
     run_command mount -o "${options},subvol=@cache" "${device}" "${MOUNT_ROOT}/var/cache" || return 1
     run_command mount -o "${options},subvol=@log" "${device}" "${MOUNT_ROOT}/var/log" || return 1
+
+    # The swapfile subvolume is mounted without compression: a compressed
+    # swapfile is unusable, and btrfs refuses to swapon one.
+    if swapfile_required; then
+        run_command mkdir -p "${MOUNT_ROOT}${SWAP_MOUNTPOINT}" || return 1
+        run_command mount -o "noatime,subvol=${SWAP_SUBVOLUME}" "${device}" \
+            "${MOUNT_ROOT}${SWAP_MOUNTPOINT}" || return 1
+    fi
+
     run_command mount "$(get_efi_partition_path)" "${MOUNT_ROOT}/boot"
 }
 

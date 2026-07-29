@@ -21,10 +21,19 @@ readonly ARCH_INSTALLER_CONFIG_LOADED="true"
 
 CONFIG_FILE="${CONFIG_FILE:-}"
 
+# Answers written by the graphical configurator.
+#
+# Sourced after the tracked configuration so it overrides it, which keeps
+# config/system.conf as reviewable defaults under version control while the
+# machine-specific answers live in a file that is not committed.
+GENERATED_CONFIG_NAME="generated.conf"
+
 load_config() {
     local root
+    local generated
 
     root="$(project_root)"
+    generated="${root}/config/${GENERATED_CONFIG_NAME}"
 
     if [[ -z "${CONFIG_FILE}" ]]; then
         CONFIG_FILE="${root}/config/system.conf"
@@ -38,6 +47,12 @@ load_config() {
 
     # shellcheck source=/dev/null
     source "${CONFIG_FILE}"
+
+    if [[ -f "${generated}" ]] && [[ "${generated}" != "${CONFIG_FILE}" ]]; then
+        info "Applying answers from ${generated}"
+        # shellcheck source=/dev/null
+        source "${generated}"
+    fi
 
     validate_config
 }
@@ -177,6 +192,14 @@ validate_btrfs_subvolumes() {
         "@cache"
         "@log"
     )
+
+    # @swap is required only when a swapfile is configured. Requiring it
+    # unconditionally would make every zram-only install carry an empty
+    # subvolume, and would make hibernation feel structurally mandatory rather
+    # than chosen.
+    if [[ ! "${SWAP_SIZE:-0GiB}" =~ ^0[A-Za-z]*$ ]]; then
+        required_subvolumes+=("@swap")
+    fi
     local required_subvolume
     local configured_subvolume
     local found
@@ -329,14 +352,20 @@ validate_config() {
         has_error="true"
     fi
 
-    if [[ "${SWAP_SIZE}" != "0MiB" ]] && [[ "${SWAP_SIZE}" != "0GiB" ]]; then
-        error "Disk swap is unsupported; SWAP_SIZE must be 0MiB or 0GiB (zram is used)."
-        has_error="true"
-    fi
-
+    # A swapfile is now supported, so that hibernation is possible. zram remains
+    # the everyday swap: it holds a higher priority, and the swapfile is reserved
+    # for hibernation and as a last resort.
     if [[ "${HIBERNATION_ENABLED}" == "true" ]]; then
-        error "Hibernation requires persistent swap and is not supported by the zram-only design."
-        has_error="true"
+        if [[ "${SWAP_SIZE}" =~ ^0[A-Za-z]*$ ]]; then
+            error "HIBERNATION_ENABLED=true requires SWAP_SIZE greater than zero."
+            error "A hibernation image is written to disk swap; zram cannot hold it."
+            has_error="true"
+        fi
+
+        if [[ "${FILESYSTEM}" != "btrfs" ]]; then
+            error "Hibernation is only implemented for the Btrfs layout."
+            has_error="true"
+        fi
     fi
 
     if [[ ! "${BTRFS_COMPRESSION_LEVEL}" =~ ^[0-9]+$ ]]; then

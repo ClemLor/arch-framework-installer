@@ -21,6 +21,13 @@ create_btrfs_layout() {
     run_command mount "${device}" "${temporary_mount}" || return 1
     for subvolume in "${BTRFS_SUBVOLUMES[@]}"; do
         run_command btrfs subvolume create "${temporary_mount}/${subvolume}" || return 1
+
+        # Must happen while the subvolume is still empty: setting the attribute
+        # afterwards does not affect extents that already exist. A copy-on-write
+        # swapfile corrupts, so this cannot be left until the file is created.
+        if [[ "${subvolume}" == "@swap" ]]; then
+            run_command chattr +C "${temporary_mount}/${subvolume}" || return 1
+        fi
     done
     run_command umount "${temporary_mount}"
 }

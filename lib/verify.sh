@@ -105,6 +105,8 @@ verify_installation_readiness() {
     verify_readiness_check "system services are enabled" verify_enabled_services || return 1
     verify_readiness_check "the user and desktop session are configured" verify_installed_user || return 1
     verify_readiness_check "zram matches the selected profile" verify_zram_configuration || return 1
+    verify_readiness_check "the swapfile is usable" verify_swapfile || return 1
+    verify_readiness_check "hibernation is wired end to end" verify_hibernation_configuration || return 1
     verify_readiness_check "the graphical login is configured" verify_graphical_session || return 1
     verify_readiness_check "Limine and boot artifacts are complete" verify_limine || return 1
     verify_readiness_check "the storage security profile is valid" verify_installed_security

@@ -191,16 +191,66 @@ Ils ne remplacent pas une sauvegarde.
 
 # Swap
 
-Le système utilise uniquement zram. Aucun swapfile persistant n'est créé.
+Deux mécanismes, avec des rôles distincts et des priorités différentes.
+
+| Mécanisme | Priorité | Rôle |
+| --- | --- | --- |
+| zram | 100 | pagination courante |
+| swapfile | 10 | hibernation, et débordement en dernier recours |
+
+Les priorités ne sont pas décoratives. À priorité égale, le noyau répartit la
+pagination sur les deux, ce qui envoie des pages actives sur le disque sans
+raison et rend le swapfile indisponible pour l'hibernation.
 
 ## zram
 
-Utilisé pour :
+Compression `zstd`, taille égale à la moitié de la mémoire.
 
-- améliorer la réactivité
-- réduire les accès disque
+**zram exige un réglage du noyau.** La valeur par défaut `vm.swappiness=60` est
+calibrée pour un swap sur disque, où écrire coûte cher et où le noyau doit
+l'éviter. zram travaille à la vitesse de la mémoire : la même prudence le laisse
+inutilisé pendant que le noyau libère du cache à la place.
 
-L'hibernation est désactivée car zram ne constitue pas un espace de reprise persistant.
+C'est exactement le symptôme observé — zram présent mais quasiment jamais
+utilisé.
+
+Le fichier `/etc/sysctl.d/99-zram.conf` corrige cela :
+
+```
+vm.swappiness = 180
+vm.page-cluster = 0
+vm.watermark_boost_factor = 0
+vm.watermark_scale_factor = 125
+```
+
+`page-cluster = 0` désactive la lecture anticipée : elle est rentable sur un
+disque et ne coûte que de la décompression sur zram.
+
+## Swapfile et hibernation
+
+L'hibernation écrit le contenu de la mémoire sur un support persistant. zram
+disparaît à la coupure du courant et ne peut donc pas servir de zone de reprise.
+
+Conditions, vérifiées par `validate_config` :
+
+- `SWAP_SIZE` supérieur à zéro ;
+- `SWAP_SIZE` au moins égal à la mémoire installée — une image d'hibernation
+  est le contenu de la RAM, et le noyau ne découvre le manque de place qu'en
+  cours de mise en veille ;
+- sous-volume `@swap` présent.
+
+Le sous-volume `@swap` est indispensable : le copy-on-write corrompt un
+swapfile. L'attribut est retiré à la création du sous-volume, tant qu'il est
+encore vide — le poser après coup n'affecte pas les extents existants. Le
+sous-volume est monté sans compression, un swapfile compressé étant inutilisable.
+
+Le fichier est créé par `btrfs filesystem mkswapfile`, qui gère le
+copy-on-write et la compression, contrairement à `dd` suivi de `mkswap`.
+
+Un swapfile sans hibernation reste possible : simple débordement au-delà de
+zram.
+
+Voir `docs/boot.md` pour les paramètres `resume` et `resume_offset`.
 
 ---
 
@@ -267,8 +317,11 @@ BTRFS_COMPRESSION="zstd"
 BTRFS_COMPRESSION_LEVEL="3"
 
 # Memory
+# SWAP_SIZE="0GiB" désactive le swapfile ; zram seul, pas d'hibernation.
+# Une valeur non nulle exige le sous-volume @swap.
 SWAP_SIZE="0GiB"
 ZRAM_ENABLED="true"
+HIBERNATION_ENABLED="false"
 ```
 
 Les scripts doivent lire ces valeurs sans modifier le fichier.

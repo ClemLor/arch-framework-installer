@@ -22,6 +22,44 @@ initramfs `linux-lts` et `linux`, ainsi que leurs deux entrées de menu.
 Secure Boot est une préparation documentée, pas une activation automatique :
 l'enrôlement de clés firmware reste une opération distincte et récupérable.
 
+## Ordre des hooks mkinitcpio
+
+L'ordre est produit par `build_mkinitcpio_hooks` (`lib/memory.sh`) plutôt qu'écrit
+à la main, parce que trois contraintes doivent tenir simultanément.
+
+```
+base systemd autodetect microcode modconf kms keyboard sd-vconsole block
+[sd-encrypt] filesystems [resume] fsck
+```
+
+| Contrainte | Conséquence si violée |
+| --- | --- |
+| `systemd` avant `sd-encrypt` | `sd-encrypt` ne dispose pas de son environnement |
+| `sd-encrypt` avant `filesystems` | la racine est cherchée avant l'ouverture du conteneur |
+| `resume` après `filesystems` | l'image d'hibernation est un fichier, il faut son système de fichiers |
+
+`sd-encrypt` n'est présent que si `LUKS_ENABLED=true`, `resume` que si
+`HIBERNATION_ENABLED=true`.
+
+## Reprise après hibernation
+
+Deux paramètres noyau, tous deux nécessaires :
+
+```
+resume=/dev/mapper/cryptroot  resume_offset=<offset>
+```
+
+`resume` seul ne suffit pas : le noyau sait alors sur quel périphérique chercher
+l'image, mais pas à quelle position. Il démarre à froid **sans signaler quoi que
+ce soit**, ce qui est le symptôme le plus déroutant à diagnostiquer.
+
+Avec LUKS, la reprise passe par `/dev/mapper/<LUKS_NAME>` : le conteneur est déjà
+ouvert par `sd-encrypt` quand `resume` s'exécute.
+
+Le décalage est lu par `btrfs inspect-internal map-swapfile --resume-offset`. Il
+change si le swapfile est recréé, et doit alors être recalculé et reporté dans
+`limine.conf` — voir `docs/update.md`.
+
 ## Vérification du mode UEFI
 
 L'installateur détecte `/sys/firmware/efi` et lit

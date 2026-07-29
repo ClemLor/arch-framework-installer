@@ -21,6 +21,8 @@ run_command() {
 }
 
 info() { :; }
+error() { :; }
+success() { :; }
 
 # shellcheck source=lib/memory.sh
 source "${ROOT}/lib/memory.sh"
@@ -33,10 +35,24 @@ configure_zram
 [[ -z "${COMMANDS}" ]]
 printf '%s\n' 'ok - enabled zram writes the generator configuration'
 
+# This is why zram appeared to do nothing: the default swappiness of 60 is tuned
+# for swap on a disk, so the kernel reclaims page cache rather than using zram.
+[[ "${WRITES}" == *'PATH:/etc/sysctl.d/99-zram.conf'* ]]
+[[ "${WRITES}" == *'vm.swappiness = 180'* ]]
+[[ "${WRITES}" == *'vm.page-cluster = 0'* ]]
+printf '%s\n' 'ok - enabled zram tunes the kernel for RAM-speed swap'
+
+# zram must outrank the swapfile, or everyday paging is striped onto disk and the
+# swapfile stops being reserved for hibernation.
+[[ "${WRITES}" == *"swap-priority = ${ZRAM_SWAP_PRIORITY}"* ]]
+(( ZRAM_SWAP_PRIORITY > SWAPFILE_SWAP_PRIORITY ))
+printf '%s\n' 'ok - zram outranks the hibernation swapfile'
+
 ZRAM_ENABLED="false"
 WRITES=''
 COMMANDS=''
 configure_zram
 [[ -z "${WRITES}" ]]
 [[ "${COMMANDS}" == *'rm -f /target/etc/systemd/zram-generator.conf'* ]]
+[[ "${COMMANDS}" == *'rm -f /target/etc/sysctl.d/99-zram.conf'* ]]
 printf '%s\n' 'ok - disabled zram removes only the installer-managed configuration'
