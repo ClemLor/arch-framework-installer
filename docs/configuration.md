@@ -58,6 +58,45 @@ implique, sinon toute taille non nulle serait bloquée faute d'un sous-volume qu
 le menu allait ajouter de lui-même — bloquer un choix pour l'une de ses propres
 conséquences.
 
+### Clavier
+
+Le clavier a **deux** noms, dans deux systèmes de nommage différents :
+
+| Variable | Portée | Exemple |
+| --- | --- | --- |
+| `KEYMAP` | console, invite de déverrouillage LUKS | `fr_CH` |
+| `XKB_LAYOUT` / `XKB_VARIANT` | session graphique | `ch` / `fr_nodeadkeys` |
+
+`fr_CH` n'est pas une disposition xkb valide, et `ch` n'est pas un keymap console
+valide : une seule valeur ne peut pas servir les deux.
+
+Le menu les définit donc **ensemble**, à partir d'un seul choix. Ne renseigner que
+`KEYMAP` laisse la session graphique en QWERTY US alors que la console est
+correcte — un symptôme qui ne ressemble pas à un problème de configuration
+clavier.
+
+Niri lit sa propre configuration et non `/etc/X11`, donc la disposition est
+injectée dans `config.kdl` :
+
+```kdl
+input {
+    keyboard {
+        xkb {
+            layout "ch"
+            variant "fr_nodeadkeys"
+        }
+        numlock
+    }
+}
+```
+
+`/etc/X11/xorg.conf.d/00-keyboard.conf` est également écrit à partir des mêmes
+valeurs. Niri ne le consulte pas, mais tout le reste oui — y compris un
+compositeur substitué plus tard.
+
+La vérification finale refuse l'installation si la disposition est absente de la
+configuration Niri.
+
 ### Disques refusés
 
 Les disques inéligibles sont listés avec leur motif plutôt que masqués :

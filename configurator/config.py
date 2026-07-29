@@ -124,7 +124,14 @@ class Configuration:
     hostname: str = "framework"
     timezone: str = "Europe/Zurich"
     locale: str = "en_US.UTF-8"
+    secondary_locale: str = "fr_CH.UTF-8"
+    #: Console keymap, as found under /usr/share/kbd/keymaps.
     keymap: str = "fr_CH"
+    #: Graphical layout. A different naming scheme from the console keymap, which
+    #: is why the menu sets all three from one choice: setting only the keymap
+    #: leaves the desktop on US QWERTY.
+    xkb_layout: str = "ch"
+    xkb_variant: str = "fr_nodeadkeys"
     username: str = "user"
     user_shell: str = "/usr/bin/fish"
 
@@ -208,7 +215,10 @@ class Configuration:
             hostname=text("HOSTNAME", "framework"),
             timezone=text("TIMEZONE", "Europe/Zurich"),
             locale=text("LOCALE", "en_US.UTF-8"),
+            secondary_locale=text("SECONDARY_LOCALE", "fr_CH.UTF-8"),
             keymap=text("KEYMAP", "fr_CH"),
+            xkb_layout=text("XKB_LAYOUT", "ch"),
+            xkb_variant=text("XKB_VARIANT", "fr_nodeadkeys"),
             username=text("USERNAME", "user"),
             user_shell=text("USER_SHELL", "/usr/bin/fish"),
             target_disk=text("TARGET_DISK", ""),
@@ -342,7 +352,12 @@ class Configuration:
             f'HOSTNAME="{self.hostname}"',
             f'TIMEZONE="{self.timezone}"',
             f'LOCALE="{self.locale}"',
+            f'SECONDARY_LOCALE="{self.secondary_locale}"',
+            "# Console keymap and graphical layout, set together: they use",
+            "# different naming schemes and must describe the same keyboard.",
             f'KEYMAP="{self.keymap}"',
+            f'XKB_LAYOUT="{self.xkb_layout}"',
+            f'XKB_VARIANT="{self.xkb_variant}"',
             f'USERNAME="{self.username}"',
             f'USER_SHELL="{self.user_shell}"',
             "",

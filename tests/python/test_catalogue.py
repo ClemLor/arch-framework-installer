@@ -215,6 +215,38 @@ class SelectionSerialisationTests(unittest.TestCase):
         self.assertEqual(reparsed.aur_packages, ["librewolf-bin", "cursor-bin"])
         self.assertTrue(reparsed.aur_selected)
 
+    def test_keyboard_values_are_written_together(self) -> None:
+        """The console keymap and the graphical layout use different naming
+        schemes. Writing one without the other leaves the desktop on US QWERTY
+        while the console is correct, which does not look like a keyboard bug."""
+        config = self.base()
+        values = parse_shell_config(config.to_shell())
+        self.assertEqual(values["KEYMAP"], "fr_CH")
+        self.assertEqual(values["XKB_LAYOUT"], "ch")
+        self.assertEqual(values["XKB_VARIANT"], "fr_nodeadkeys")
+        self.assertEqual(values["SECONDARY_LOCALE"], "fr_CH.UTF-8")
+
+    def test_keyboard_table_pairs_are_consistent(self) -> None:
+        """Every offered choice must supply both names; a table entry missing the
+        xkb layout would silently produce the failure this exists to prevent."""
+        from configurator.menu import KEYBOARD_LAYOUTS
+
+        for keymap, layout, _variant, label in KEYBOARD_LAYOUTS:
+            with self.subTest(label=label):
+                self.assertTrue(keymap)
+                self.assertTrue(layout)
+                self.assertTrue(label)
+
+    def test_keyboard_choice_round_trips(self) -> None:
+        config = self.base()
+        config.keymap = "de_CH-latin1"
+        config.xkb_layout = "ch"
+        config.xkb_variant = "de_nodeadkeys"
+
+        reparsed = Configuration.from_shell(parse_shell_config(config.to_shell()))
+        self.assertEqual(reparsed.keymap, "de_CH-latin1")
+        self.assertEqual(reparsed.xkb_variant, "de_nodeadkeys")
+
     def test_swappable_components_round_trip(self) -> None:
         config = self.base()
         values = parse_shell_config(config.to_shell())

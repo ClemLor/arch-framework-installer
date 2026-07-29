@@ -25,6 +25,49 @@ desktop_niri_packages() {
     printf '%s\n' niri dms-shell-niri greetd
 }
 
+# The graphical keyboard layout.
+#
+# The console keymap (/etc/vconsole.conf) and the graphical layout use different
+# naming schemes — fr_CH against ch/fr_nodeadkeys — and setting only the first
+# leaves the desktop on US QWERTY. On a Swiss keyboard that is a session where
+# half the punctuation is wrong, and it is not obvious that the cause is a
+# missing xkb block rather than the keymap that was set correctly.
+#
+# Niri reads its own configuration rather than /etc/X11, so the block is injected
+# into config.kdl. The asset carries `keyboard { numlock }`, and the layout is
+# added inside it.
+desktop_niri_keyboard_block() {
+    printf '        xkb {\n'
+    printf '            layout "%s"\n' "${XKB_LAYOUT}"
+    if [[ -n "${XKB_VARIANT}" ]]; then
+        printf '            variant "%s"\n' "${XKB_VARIANT}"
+    fi
+    printf '        }\n'
+}
+
+# Inserted after the `keyboard {` line so the asset stays readable and free of
+# placeholder markers. Idempotent: an existing xkb block means the layout is
+# already set and the configuration is returned unchanged.
+desktop_niri_apply_keyboard() {
+    local config="$1"
+
+    if [[ "${config}" == *'xkb {'* ]]; then
+        printf '%s' "${config}"
+        return 0
+    fi
+
+    # print rather than printf: command substitution strips the block's trailing
+    # newline, and without one the line that followed `keyboard {` ends up
+    # appended to the closing brace.
+    printf '%s' "${config}" | awk -v block="$(desktop_niri_keyboard_block)" '
+        { print }
+        /^[[:space:]]*keyboard[[:space:]]*\{/ && !inserted {
+            print block
+            inserted = 1
+        }
+    '
+}
+
 desktop_lock_launcher_path() {
     printf '/home/%s/.local/bin/lock-dms-session' "${USERNAME}"
 }
@@ -96,6 +139,7 @@ desktop_niri_configure_user() {
     niri_dropin_path="$(desktop_niri_dropin_path)"
     niri_wants_path="$(desktop_niri_wants_path)"
     niri_config="$(<"$(project_root)/assets/niri/config.kdl")" || return 1
+    niri_config="$(desktop_niri_apply_keyboard "${niri_config}")" || return 1
 
     run_in_chroot test -f /usr/lib/systemd/user/dms.service || return 1
     run_in_chroot install -d -m0755 -o "${USERNAME}" -g "${USERNAME}" \
@@ -184,6 +228,15 @@ desktop_niri_verify_user() {
     verify_target_file "${niri_config_path}" || return 1
     verify_target_file "${niri_dropin_path}" || return 1
     run_in_chroot niri validate --config "${niri_config_path}" || return 1
+
+    # Without this the session runs on US QWERTY while the console keymap is
+    # correct, which does not present as a keyboard configuration problem.
+    if [[ "${DRY_RUN:-false}" != "true" ]]; then
+        grep -Fq "layout \"${XKB_LAYOUT}\"" "${MOUNT_ROOT}${niri_config_path}" || {
+            error "The Niri configuration does not set the keyboard layout."
+            return 1
+        }
+    fi
 
     if [[ "${DMS_LOCK_ON_START}" != "true" ]]; then
         return 0

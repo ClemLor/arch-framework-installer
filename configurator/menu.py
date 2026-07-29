@@ -217,6 +217,20 @@ def ask_locked_choice(
 # Entries
 # ------------------------------------------------------------------------------
 
+# Console keymap, xkb layout, xkb variant, label.
+#
+# Kept as one table because the console and graphical names differ and getting
+# one right while leaving the other wrong is the classic way to end up with a
+# keyboard that works in the TTY and not in the desktop.
+KEYBOARD_LAYOUTS: list[tuple[str, str, str, str]] = [
+    ("fr_CH", "ch", "fr_nodeadkeys", "Swiss French"),
+    ("de_CH-latin1", "ch", "de_nodeadkeys", "Swiss German"),
+    ("fr", "fr", "", "French (AZERTY)"),
+    ("de-latin1", "de", "nodeadkeys", "German"),
+    ("uk", "gb", "", "British English"),
+    ("us", "us", "", "US English"),
+]
+
 SWAP_CHOICES = [Size(0), Size(8 * 1024), Size(16 * 1024), Size(32 * 1024), Size(64 * 1024)]
 EFI_CHOICES = [Size(512), Size(1024), Size(2048), Size(4096)]
 KERNELS = ["linux-lts", "linux", "linux-zen", "linux-hardened"]
@@ -420,16 +434,47 @@ def build_menu() -> Menu:
 
     def edit_locale(config: Configuration) -> str | None:
         config.locale = ask_text("Locale", config.locale)
-        config.keymap = ask_text("Console keymap", config.keymap)
+        config.secondary_locale = ask_text(
+            "Secondary locale", config.secondary_locale
+        )
+
+        # One choice sets the console keymap and the graphical layout together.
+        # They use different naming schemes, and setting only the keymap leaves
+        # the desktop on US QWERTY while the console is correct — a failure that
+        # does not look like a keyboard configuration problem.
+        current = next(
+            (entry for entry in KEYBOARD_LAYOUTS if entry[0] == config.keymap), None
+        )
+        chosen = ask_locked_choice(
+            "Keyboard",
+            [
+                (entry, f"{entry[3]}  (console {entry[0]}, xkb {entry[1]})", None)
+                for entry in KEYBOARD_LAYOUTS
+            ],
+            current,
+        )
+        if chosen is not None:
+            keymap, xkb_layout, xkb_variant, _ = chosen  # type: ignore[misc]
+            config.keymap = keymap
+            config.xkb_layout = xkb_layout
+            config.xkb_variant = xkb_variant
+
         config.timezone = ask_text("Timezone", config.timezone)
         return None
 
     menu.add(
         Entry(
             key="locale",
-            label="Locale and timezone",
-            preview=lambda c: f"{c.locale}, {c.keymap}, {c.timezone}",
+            label="Locale and keyboard",
+            preview=lambda c: (
+                f"{c.locale}, {c.keymap}"
+                f"{'/' + c.xkb_variant if c.xkb_variant else ''}, {c.timezone}"
+            ),
             edit=edit_locale,
+            help_text=(
+                "The console keymap and the graphical layout use different naming "
+                "schemes; both are set from one choice so they cannot disagree."
+            ),
         )
     )
 
