@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arch-framework-installer"
+version = "0.1.0"
+description = "Reproducible Arch Linux installer for Framework laptops"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+
+# Deliberately narrow. pyparted is not used: sgdisk, cryptsetup and the btrfs
+# tools are driven through lib/command.py instead, which keeps the models and
+# the TUI importable on a non-Linux development machine.
+#
+# textual is optional at runtime. It ships on the Arch ISO only because
+# archinstall depends on it, which is a transitive guarantee that could
+# disappear; lib/tui falls back to a plain-prompt renderer when it is absent.
+dependencies = [
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+tui = ["textual>=0.60"]
+dev = ["pytest>=8.0", "textual>=0.60"]
+
+[project.scripts]
+arch-framework-installer = "arch_framework.main:main"
+
+[tool.setuptools.packages.find]
+include = ["arch_framework*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

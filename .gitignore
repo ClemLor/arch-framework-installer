@@ -14,6 +14,16 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Generated installer configuration. The saved config is a reproducibility
+# artefact worth keeping, but it belongs next to the machine, not in the repo,
+# and the credentials file must never be committed.
+framework-install.json
+*-creds.json
 
 # Secrets
 .env
