@@ -15,6 +15,12 @@ __pycache__/
 .venv/
 venv/
 
+# Answers written by the configurator. These describe one machine, not the
+# project, so they stay out of version control while config/system.conf remains
+# the reviewable default. Deleting this file returns the installer to those
+# defaults.
+config/generated.conf
+
 # Secrets
 .env
 .env.*

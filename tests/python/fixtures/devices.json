@@ -1,0 +1,38 @@
+{
+  "_comment": [
+    "A Framework 13 booted from the Arch ISO on a USB stick.",
+    "Recorded shape: lsblk --json --bytes --paths --output-all.",
+    "nvme0n1 is the intended target. sdb is the live medium and must be refused."
+  ],
+  "blockdevices": [
+    {
+      "name": "/dev/nvme0n1",
+      "path": "/dev/nvme0n1",
+      "type": "disk",
+      "size": 1000204886016,
+      "model": "WD_BLACK SN770 1TB",
+      "tran": "nvme",
+      "rm": false,
+      "mountpoints": [null]
+    },
+    {
+      "name": "/dev/sdb",
+      "path": "/dev/sdb",
+      "type": "disk",
+      "size": 31021957120,
+      "model": "Ultra Fit",
+      "tran": "usb",
+      "rm": true,
+      "mountpoints": [null],
+      "children": [
+        {
+          "name": "/dev/sdb1",
+          "path": "/dev/sdb1",
+          "type": "part",
+          "size": 1073741824,
+          "mountpoints": ["/run/archiso/bootmnt"]
+        }
+      ]
+    }
+  ]
+}

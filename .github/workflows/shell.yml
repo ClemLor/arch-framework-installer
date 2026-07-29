@@ -1,4 +1,4 @@
-name: Shell validation
+name: Validation
 
 on:
   push:
@@ -23,3 +23,33 @@ jobs:
           for test_file in tests/unit/*.sh; do
             bash "${test_file}"
           done
+      # The configurator uses only the standard library, so no dependency step:
+      # if it needed one, it could not run on the Arch ISO as shipped.
+      - name: Configurator compiles
+        run: python3 -m compileall -q configurator
+      - name: Configurator tests
+        run: python3 -m unittest discover -s tests/python -v
+      # Round-trip guard: the menu writes Bash that lib/config.sh sources, so a
+      # generated file that the shell rejects is a broken contract between the
+      # two halves, not a cosmetic problem.
+      - name: Generated configuration is accepted by the shell
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, '.')
+          from configurator.config import Configuration
+          config = Configuration.load(Path('config/system.conf'))
+          config.memory_mib = 8 * 1024
+          config.set_hibernation(True)
+          config.save(Path('config/generated.conf'))
+          PY
+          cat config/generated.conf
+          bash -c '
+            source lib/logging.sh
+            source lib/common.sh
+            source lib/commands.sh
+            source lib/config.sh
+            validate_timezone() { return 0; }
+            load_config
+          '

@@ -5,6 +5,23 @@ LUKS2/TPM2, Btrfs, Limine et un bureau Niri + Dank Material Shell.
 
 ## Utilisation depuis l'ISO Arch UEFI
 
+### Menu guidé
+
+```bash
+python3 -m configurator          # configurer, puis Save ou Install
+python3 -m configurator --show   # état courant et problèmes, sans rien modifier
+```
+
+Le menu écrit `config/generated.conf`, que `install.sh` charge après
+`config/system.conf`. Les options incompatibles sont affichées verrouillées avec
+leur raison — activer l'hibernation verrouille par exemple « pas de swapfile » et
+toute taille inférieure à la mémoire installée.
+
+Il n'installe rien lui-même : toute opération destructive reste dans `install.sh`.
+Aucune dépendance Python en dehors de la bibliothèque standard.
+
+### Directement
+
 ```bash
 sudo ./install.sh --inspect
 sudo ./install.sh --plan-storage --config config/system.conf
@@ -24,4 +41,5 @@ Les tests unitaires n'utilisent que des mocks :
 for test_file in tests/unit/*.sh; do
     bash "${test_file}"
 done
+python3 -m unittest discover -s tests/python
 ```

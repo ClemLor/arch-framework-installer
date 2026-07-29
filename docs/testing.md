@@ -22,11 +22,21 @@ bash tests/unit/test_encryption_modes.sh
 bash tests/unit/test_boot_modes.sh
 bash tests/unit/test_desktop_session.sh
 bash tests/unit/test_zram_configuration.sh
+bash tests/unit/test_swap_configuration.sh
+bash tests/unit/test_hibernation.sh
 bash tests/unit/test_config_values.sh
 bash tests/unit/test_user_configuration.sh
 bash tests/unit/test_services.sh
 bash tests/unit/test_readiness.sh
 bash tests/unit/test_vm_validator.sh
+```
+
+Le configurateur Python a sa propre suite, bibliothèque standard uniquement —
+l'ISO ne fournit pas pytest, et une suite qui ne peut pas y tourner cesse d'être
+exécutée :
+
+```bash
+python3 -m unittest discover -s tests/python
 ```
 
 Les tests d'intégration sur loop device exigent un environnement isolé dédié.
@@ -36,7 +46,7 @@ manuellement sur le Framework après sauvegarde vérifiée.
 Après le redémarrage de la VM, `tests/vm/validate_installation.sh` vérifie en
 lecture seule le montage Btrfs, Limine, le profil LUKS2/TPM2, les paquets et
 services, la présence d'un nœud de rendu DRM, la configuration et la session
-Niri/DMS, puis zram. Les profils attendus sont fournis
+Niri/DMS, puis la mémoire. Les profils attendus sont fournis
 explicitement en arguments afin que le test ne valide pas simplement l'état
 qu'il découvre.
 
@@ -44,6 +54,32 @@ Les programmes du système testé, notamment `niri`, ne sont pas des dépendance
 du validateur. S'ils manquent, les contrôles des paquets et de la session
 échouent, mais les autres diagnostics continuent afin de produire un rapport
 complet.
+
+## Mémoire et hibernation
+
+Le validateur exige désormais `--hibernation enabled|disabled` :
+
+```bash
+sudo ./tests/vm/validate_installation.sh \
+  --user framework --encryption enabled --tpm2 enabled \
+  --zram enabled --hibernation enabled
+```
+
+Un périphérique zram actif ne prouve pas qu'il est utilisé. Le validateur
+contrôle donc séparément :
+
+| Contrôle | Ce qu'il attrape |
+| --- | --- |
+| `vm.swappiness >= 100` | zram présent mais laissé inutilisé — le symptôme observé |
+| `vm.page-cluster == 0` | lecture anticipée inutile sur zram |
+| priorité zram > swapfile | pagination courante envoyée sur le disque |
+| `resume=` **et** `resume_offset=` | reprise silencieusement remplacée par un démarrage à froid |
+| `resume_offset` égal à l'offset réel | swapfile recréé, décalage périmé |
+| attribut `C` sur le swapfile | copy-on-write, qui corrompt le swapfile |
+
+Le contrôle du décalage recalcule la valeur avec
+`btrfs inspect-internal map-swapfile` et la compare à `/proc/cmdline`, plutôt que
+de se contenter de vérifier qu'un paramètre existe.
 
 Le test de readiness reproduit la syntaxe `subvol=/@` émise par `genfstab` et
 vérifie aussi le profil historique `subvol=@`. Les autres sous-volumes ne sont

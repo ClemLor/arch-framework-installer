@@ -22,9 +22,25 @@ The installer runs from the official Arch Linux live ISO in UEFI mode.
 - Framework Laptop optimizations
 - Niri with Dank Material Shell desktop environment
 
+## Two components
+
+`install.sh` plus `lib/` and `tasks/` is the installer. It is Bash, it runs on the
+live ISO, and it is the only thing that touches storage.
+
+`configurator/` is a configuration front-end in Python. It writes
+`config/generated.conf` and then hands over to `install.sh`. It must never
+partition, format, or write to a target system: one implementation of the
+destructive work, in one language, is the point.
+
+`lib/config.sh` remains authoritative on validity. The configurator's rules in
+`configurator/constraints.py` mirror it so that problems can be explained early,
+never so that the shell can trust them.
+
 ## Coding rules
 
-- Use Bash.
+- Use Bash for the installer.
+- The configurator is Python, standard library only. A dependency it cannot get
+  on the ISO is a dependency it cannot have.
 - Start executable scripts with `#!/usr/bin/env bash`.
 - Use `set -Eeuo pipefail` in entry points.
 - Quote all variable expansions unless intentional.
@@ -84,6 +100,7 @@ bash -n install.sh
 bash -n lib/*.sh
 bash -n tasks/*.sh
 shellcheck install.sh lib/*.sh tasks/*.sh tests/**/*.sh
+python3 -m unittest discover -s tests/python
 ```
 
 Add tests for new behavior.
