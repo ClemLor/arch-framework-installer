@@ -31,20 +31,38 @@ readonly AUR_LIST_PATH="${AUR_SHARE_DIRECTORY}/aur.list"
 readonly AUR_HELPER='paru'
 readonly AUR_HELPER_REPOSITORY='https://aur.archlinux.org/paru.git'
 
-configure_aur_setup() {
-    local root
+# The packages to install after reboot.
+#
+# AUR_PACKAGES from the configuration wins when set, so the menu can offer the
+# list as checkboxes. An unset variable means the whole of packages/aur.list,
+# which keeps a hand-edited configuration working. An explicitly empty array
+# means the user deselected everything, and is honoured.
+selected_aur_packages() {
     local list
+    list="$(project_root)/packages/aur.list"
 
-    root="$(project_root)"
-    list="${root}/packages/aur.list"
+    if [[ -n "${AUR_PACKAGES+x}" ]]; then
+        (( ${#AUR_PACKAGES[@]} == 0 )) && return 0
+        printf '%s\n' "${AUR_PACKAGES[@]}"
+        return
+    fi
 
-    if [[ ! -s "${list}" ]]; then
-        info "No AUR packages configured; the setup script is still installed."
+    [[ -s "${list}" ]] || return 0
+    read_package_list "${list}"
+}
+
+configure_aur_setup() {
+    local packages
+
+    packages="$(selected_aur_packages)"
+
+    if [[ -z "${packages}" ]]; then
+        info "No AUR packages selected; the setup script is still installed for later."
     fi
 
     # The list has to live on the target: the repository will not be there after
     # a reboot, and the script must remain useful for retries and later additions.
-    write_target_file "${AUR_LIST_PATH}" "$(read_package_list "${list}")
+    write_target_file "${AUR_LIST_PATH}" "${packages}
 " || return 1
 
     write_aur_setup_script || return 1

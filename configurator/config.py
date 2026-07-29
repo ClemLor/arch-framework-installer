@@ -149,9 +149,23 @@ class Configuration:
     # Boot
     default_kernel: str = "linux-lts"
     fallback_kernel: str = "linux"
+    #: Swappable component, dispatched by name in lib/provider.sh.
+    bootloader: str = "limine"
 
     # Desktop
     desktop_autologin: bool = True
+    #: Swappable components, same dispatch.
+    desktop_compositor: str = "niri"
+    desktop_shell: str = "dank"
+
+    # Software selection
+    #: Package groups to install. Empty means every group, matching the shell's
+    #: behaviour when PACKAGE_GROUPS is unset.
+    package_groups: list[str] = field(default_factory=list)
+    #: AUR packages for afi-aur-setup. Distinguished from "unset" by
+    #: aur_selected, because an empty selection is a real choice.
+    aur_packages: list[str] = field(default_factory=list)
+    aur_selected: bool = False
 
     # -- observed, not configurable -------------------------------------------
     #: Installed memory in MiB. Zero when unknown, which disables the rules that
@@ -182,6 +196,10 @@ class Configuration:
                     return default
             return default
 
+        def array(name: str) -> list[str]:
+            value = values.get(name)
+            return list(value) if isinstance(value, list) else []
+
         subvolumes = values.get("BTRFS_SUBVOLUMES")
         if not isinstance(subvolumes, list) or not subvolumes:
             subvolumes = ["@", "@home", "@snapshots", "@cache", "@log"]
@@ -205,7 +223,13 @@ class Configuration:
             hibernation_enabled=_as_bool(values.get("HIBERNATION_ENABLED"), False),
             default_kernel=text("DEFAULT_KERNEL", "linux-lts"),
             fallback_kernel=text("FALLBACK_KERNEL", "linux"),
+            bootloader=text("BOOTLOADER", "limine"),
             desktop_autologin=_as_bool(values.get("DESKTOP_AUTOLOGIN"), True),
+            desktop_compositor=text("DESKTOP_COMPOSITOR", "niri"),
+            desktop_shell=text("DESKTOP_SHELL", "dank"),
+            package_groups=array("PACKAGE_GROUPS"),
+            aur_packages=array("AUR_PACKAGES"),
+            aur_selected="AUR_PACKAGES" in values,
         )
 
     @classmethod
@@ -346,12 +370,30 @@ class Configuration:
                 "# Boot",
                 f'DEFAULT_KERNEL="{self.default_kernel}"',
                 f'FALLBACK_KERNEL="{self.fallback_kernel}"',
+                f'BOOTLOADER="{self.bootloader}"',
                 "",
                 "# Desktop",
                 f'DESKTOP_AUTOLOGIN="{str(self.desktop_autologin).lower()}"',
+                f'DESKTOP_COMPOSITOR="{self.desktop_compositor}"',
+                f'DESKTOP_SHELL="{self.desktop_shell}"',
                 "",
             ]
         )
+
+        # Omitted entirely when nothing was chosen, because the shell treats an
+        # unset PACKAGE_GROUPS as "every group" and an empty array as "none".
+        if self.package_groups:
+            lines.append("# Package groups. Mandatory groups are added back by the shell.")
+            lines.append("PACKAGE_GROUPS=(")
+            lines.extend(f'    "{group}"' for group in self.package_groups)
+            lines.extend([")", ""])
+
+        if self.aur_selected:
+            lines.append("# Installed after the first boot by afi-aur-setup.")
+            lines.append("AUR_PACKAGES=(")
+            lines.extend(f'    "{package}"' for package in self.aur_packages)
+            lines.extend([")", ""])
+
         return "\n".join(lines)
 
     def save(self, path: Path) -> None:

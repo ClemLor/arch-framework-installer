@@ -8,15 +8,19 @@
 # bootstrapped separately from its own PKGBUILD.
 #
 # Review the PKGBUILDs before trusting them. One package per line.
+#
+# A trailing comment on a package's own line is shown as its description in the
+# configuration menu. Standalone comments like the ones above are for readers of
+# this file and are not displayed.
 
 # Browsers
-librewolf-bin
-microsoft-edge-stable-bin
+librewolf-bin              # Firefox without telemetry
+microsoft-edge-stable-bin  # Chromium-based, proprietary
 
 # Editors.
 #
 # visual-studio-code-bin is Microsoft's build, not the OSS `code` package in
 # extra. The difference is not cosmetic: only this one can use the Microsoft
 # Marketplace, so Copilot, Pylance and the Remote extensions work.
-visual-studio-code-bin
-cursor-bin
+visual-studio-code-bin     # Microsoft build; Marketplace works
+cursor-bin                 # AI-first VS Code fork

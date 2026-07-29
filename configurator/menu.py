@@ -17,7 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
-from . import constraints
+from . import catalogue, constraints
 from .config import Configuration, Size
 from .devices import enumerate_disks
 
@@ -101,6 +101,77 @@ def ask_bool(label: str, current: bool) -> bool:
         if answer in {"n", "no"}:
             return False
         print("  Answer y or n.")
+
+
+def ask_checkboxes(
+    label: str,
+    options: list[tuple[object, str, str | None]],
+    selected: list[object],
+    *,
+    locked_on: list[object] = (),
+) -> list[object]:
+    """Toggle any number of options, archinstall-style.
+
+    Each option is ``(value, description, unavailable_reason)``. ``locked_on``
+    values are always selected and cannot be turned off — used for the package
+    groups the machine would not boot without, which are better shown as
+    permanently ticked than hidden.
+    """
+    chosen = {
+        value for value, _, reason in options if value in selected and not reason
+    }
+    chosen.update(locked_on)
+
+    print(f"\n{label}")
+    while True:
+        for number, (value, description, reason) in enumerate(options, start=1):
+            if reason:
+                mark = "-"
+            elif value in chosen:
+                mark = "x"
+            else:
+                mark = " "
+
+            suffix = ""
+            if value in locked_on:
+                suffix = "  (always installed)"
+            print(f"  {number:>2}) [{mark}] {description}{suffix}")
+            if reason:
+                print(f"          unavailable: {reason}")
+
+        print("   a) select all    n) select none    Enter) accept")
+        answer = _read("Toggle: ").strip().lower()
+
+        if not answer:
+            return [value for value, _, _ in options if value in chosen]
+
+        if answer == "a":
+            chosen = {
+                value for value, _, reason in options if not reason
+            } | set(locked_on)
+            continue
+        if answer == "n":
+            chosen = set(locked_on)
+            continue
+
+        if not answer.isdigit():
+            print("  Enter a number, a, n, or Enter.")
+            continue
+
+        index = int(answer) - 1
+        if index not in range(len(options)):
+            print("  Out of range.")
+            continue
+
+        value, description, reason = options[index]
+        if reason:
+            print(f"  Not available: {reason}")
+            continue
+        if value in locked_on:
+            print(f"  {description} cannot be removed.")
+            continue
+
+        chosen.symmetric_difference_update({value})
 
 
 def ask_locked_choice(
@@ -363,17 +434,150 @@ def build_menu() -> Menu:
     )
 
     def edit_desktop(config: Configuration) -> str | None:
+        # Offered from the names lib/provider.sh declares, so adding a compositor
+        # makes it appear here without this file changing.
+        compositors = catalogue.supported("compositors")
+        if len(compositors) > 1:
+            config.desktop_compositor = str(
+                ask_locked_choice(
+                    "Compositor",
+                    [(name, name, None) for name in compositors],
+                    config.desktop_compositor,
+                )
+            )
+
         config.desktop_autologin = ask_bool(
-            "Log in automatically to the Niri session", config.desktop_autologin
+            f"Log in automatically to the {config.desktop_compositor} session",
+            config.desktop_autologin,
         )
         return None
 
     menu.add(
         Entry(
             key="desktop_autologin",
-            label="Desktop autologin",
-            preview=lambda c: "on" if c.desktop_autologin else "off",
+            label="Desktop session",
+            preview=lambda c: (
+                f"{c.desktop_compositor}"
+                f"{' + ' + c.desktop_shell if c.desktop_shell else ''}"
+                f"{', autologin' if c.desktop_autologin else ''}"
+            ),
             edit=edit_desktop,
+            help_text=(
+                "Only implemented sessions are offered. Adding one means adding "
+                "desktop_<name>_* functions in lib/ and listing the name."
+            ),
+        )
+    )
+
+    def edit_bootloader(config: Configuration) -> str | None:
+        bootloaders = catalogue.supported("bootloaders")
+        if len(bootloaders) <= 1:
+            raise ValueError(
+                f"{bootloaders[0] if bootloaders else 'none'} is the only "
+                "implemented bootloader; there is nothing to choose"
+            )
+        config.bootloader = str(
+            ask_locked_choice(
+                "Bootloader",
+                [(name, name, None) for name in bootloaders],
+                config.bootloader,
+            )
+        )
+        return None
+
+    menu.add(
+        Entry(
+            key="bootloader",
+            label="Bootloader",
+            preview=lambda c: c.bootloader,
+            edit=edit_bootloader,
+            help_text=(
+                "Chosen by name and dispatched, so adding one means adding "
+                "bootloader_<name>_* functions and listing the name."
+            ),
+        )
+    )
+
+    # -- software selection ---------------------------------------------------
+
+    def edit_groups(config: Configuration) -> str | None:
+        groups = catalogue.package_groups()
+        mandatory = [group.name for group in groups if group.mandatory]
+
+        # Nothing selected yet means everything, which is what the shell does
+        # with an unset PACKAGE_GROUPS.
+        current = config.package_groups or [group.name for group in groups]
+
+        chosen = ask_checkboxes(
+            "Package groups",
+            [(group.name, group.description, None) for group in groups],
+            current,
+            locked_on=mandatory,
+        )
+
+        # Recorded as "all" rather than an explicit list when nothing was
+        # deselected, so the generated file stays quiet about defaults.
+        if len(chosen) == len(groups):
+            config.package_groups = []
+            return "every group selected"
+
+        config.package_groups = [str(name) for name in chosen]
+        skipped = [g.name for g in groups if g.name not in chosen]
+        return f"skipping: {', '.join(skipped)}"
+
+    menu.add(
+        Entry(
+            key="package_groups",
+            label="Package groups",
+            preview=lambda c: (
+                "all" if not c.package_groups else ", ".join(c.package_groups)
+            ),
+            edit=edit_groups,
+            help_text=(
+                "base, firmware and framework cannot be deselected: without them "
+                "the result does not boot or cannot be repaired."
+            ),
+        )
+    )
+
+    def edit_aur(config: Configuration) -> str | None:
+        packages = catalogue.aur_packages()
+        if not packages:
+            raise ValueError("packages/aur.list is empty; nothing to choose")
+
+        current = (
+            config.aur_packages
+            if config.aur_selected
+            else [package.name for package in packages]
+        )
+
+        chosen = ask_checkboxes(
+            "AUR software (installed after the first boot)",
+            [(package.name, package.description, None) for package in packages],
+            current,
+        )
+
+        config.aur_packages = [str(name) for name in chosen]
+        config.aur_selected = True
+
+        if not chosen:
+            return "no AUR software; afi-aur-setup is still installed for later"
+        return f"{len(chosen)} package(s) selected"
+
+    menu.add(
+        Entry(
+            key="aur_packages",
+            label="AUR software",
+            preview=lambda c: (
+                "all" if not c.aur_selected
+                else (", ".join(c.aur_packages) if c.aur_packages else "none")
+            ),
+            edit=edit_aur,
+            help_text=(
+                "Built after the first boot by afi-aur-setup, never during the "
+                "installation: a broken PKGBUILD must not be able to fail an "
+                "install that would otherwise boot."
+            ),
         )
     )
 
