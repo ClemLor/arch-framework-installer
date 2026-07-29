@@ -81,9 +81,11 @@ def test_a_reloaded_configuration_can_install_without_reanswering(
     InstallConfig.model_validate(payload).save(target)
 
     keystrokes(monkeypatch, "i")
-    # 2 is "configuration complete, installation not implemented yet", which is
-    # the install path being reached — not the mandatory-entry guard refusing.
-    assert main(["--tui", "--renderer", "plain", "--config", str(target)]) == 2
+    # The install path is reached — it then refuses for a different reason: with
+    # no terminal there is nowhere to ask for the LUKS passphrase. That is the
+    # credentials guard, not the mandatory-entry guard, which is the distinction
+    # this test is about.
+    assert main(["--tui", "--renderer", "plain", "--config", str(target)]) == 1
 
 
 def test_a_fresh_run_cannot_install_the_placeholder_disk(

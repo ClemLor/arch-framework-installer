@@ -1,0 +1,18 @@
+# Framework laptop specifics.
+
+# TPM2 access, required for unlocking the disk without typing a passphrase.
+tpm2-tss
+tpm2-tools
+
+# Power management. A laptop that does not suspend properly is a laptop with no
+# battery life, and the Framework's expansion cards make USB power behaviour
+# worth being able to inspect.
+power-profiles-daemon
+powertop
+usbutils
+
+# Sensors and fan behaviour
+lm_sensors
+
+# Brightness and input on a machine with no vendor tooling
+brightnessctl

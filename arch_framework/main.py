@@ -47,6 +47,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="validate and print the planned disk layout, then exit",
     )
+    mode.add_argument(
+        "--install",
+        action="store_true",
+        help="install from a configuration without opening the menu",
+    )
 
     parser.add_argument(
         "--config",
@@ -177,6 +182,86 @@ def inspect(config: InstallConfig) -> int:
     return 0
 
 
+def plan_storage(config: InstallConfig) -> int:
+    """Print the exact command sequence without executing any of it.
+
+    Read-only. The same functions that would run the installation produce this
+    list, so what is shown is what would happen rather than a description of it.
+    """
+    from .lib.bootloader import limine
+    from .lib.configure import render_crypttab, render_fstab, render_mkinitcpio
+    from .lib.disk import filesystem, partitioning
+
+    handler = DeviceHandler()
+
+    # The whole plan goes to stdout as one document, so `--plan-storage > plan.txt`
+    # produces something reviewable. Only warnings go to stderr.
+    def out(line: str = "") -> None:
+        print(line)
+
+    verdict = handler.safety(config.disk.target_disk, read_only_mode=True)
+    out("# Storage plan")
+    out()
+    out("## Target")
+    out(f"  {config.disk.target_disk}: {verdict}")
+
+    info = handler.info(config.disk.target_disk)
+    if info is not None and info.size is not None:
+        out(f"  size: {info.size.human()}")
+        try:
+            config.validate_capacity(info.size)
+            out(f"  root would get {config.root_size_for(info.size).human()}")
+        except InstallerError as exc:
+            log.warn(str(exc))
+            out(f"  PROBLEM: {exc}")
+
+    mapper = (
+        config.encryption.mapper_path
+        if config.encryption.enabled
+        else config.disk.system_partition
+    )
+
+    out()
+    out("## Planned commands (not executed)")
+    for argv in [
+        *partitioning.partition_commands(config.disk),
+        ["mkfs.fat", "-F32", "-n", config.disk.efi_label, config.disk.efi_partition],
+        *filesystem.mount_commands(config.disk, mapper),
+        *filesystem.swapfile_commands(config.swap),
+    ]:
+        out("  " + " ".join(argv))
+
+    out()
+    out("## Planned files")
+    uuid = f"<UUID-of-{config.disk.system_partition}>"
+    for name, content in (
+        ("/etc/fstab", render_fstab(config, mapper, f"<UUID-of-{config.disk.efi_partition}>")),
+        ("/etc/crypttab.initramfs", render_crypttab(config, uuid) if config.encryption.enabled else ""),
+        ("/etc/mkinitcpio.conf", render_mkinitcpio(config)),
+        (
+            "/boot/limine.conf",
+            limine.render_config(
+                config,
+                limine.kernel_cmdline(
+                    config,
+                    uuid,
+                    mapper,
+                    "<resume-offset>" if config.swap.hibernation_enabled else None,
+                ),
+            ),
+        ),
+    ):
+        if not content:
+            continue
+        out()
+        out(f"  {name}")
+        for line in content.splitlines():
+            out(f"    | {line}")
+
+    log.success("Plan generated without modifying anything.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
@@ -195,8 +280,17 @@ def main(argv: list[str] | None = None) -> int:
             return inspect(config)
 
         if args.plan_storage:
-            log.error("--plan-storage is not implemented on this branch yet.")
-            return 2
+            return plan_storage(config)
+
+        if args.install:
+            from .lib.installer import install
+            from .scripts import credentials as creds
+
+            interactive = sys.stdin.isatty()
+            collected = creds.collect(
+                config, path=args.creds, interactive=interactive
+            )
+            return install(config, collected, interactive=interactive)
 
         if args.tui:
             from .scripts import guided
@@ -206,6 +300,7 @@ def main(argv: list[str] | None = None) -> int:
                 config_path=args.config or DEFAULT_CONFIG_PATH,
                 renderer_name=args.renderer,
                 from_saved=args.config is not None and args.config.exists(),
+                creds_path=args.creds,
             )
 
         log.error("No mode selected. Try --tui, --inspect or --help.")

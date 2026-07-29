@@ -1,0 +1,48 @@
+wipefs --all /dev/nvme0n1
+sgdisk --zap-all /dev/nvme0n1
+sgdisk --new=1:1M:1025M --typecode=1:ef00 --change-name=1:EFI /dev/nvme0n1
+sgdisk --new=2:1025M:0 --typecode=2:8309 --change-name=2:ARCH /dev/nvme0n1
+partprobe /dev/nvme0n1
+mkfs.fat -F32 -n EFI /dev/nvme0n1p1
+cryptsetup luksFormat --type luks2 --pbkdf argon2id --cipher aes-xts-plain64 --key-size 512 --hash sha512 --batch-mode --key-file - /dev/nvme0n1p2
+cryptsetup open --key-file - /dev/nvme0n1p2 cryptroot
+cryptsetup luksAddKey --batch-mode --key-file - /dev/nvme0n1p2 /run/arch-framework-installer-recovery.key
+mkfs.btrfs --force --label ARCH /dev/mapper/cryptroot
+mount /dev/mapper/cryptroot /mnt
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@snapshots
+btrfs subvolume create /mnt/@cache
+btrfs subvolume create /mnt/@log
+btrfs subvolume create /mnt/@swap
+chattr +C /mnt/@swap
+umount /mnt
+mount --options subvol=@,noatime,compress=zstd:3 /dev/mapper/cryptroot /mnt
+mkdir --parents /mnt/home
+mount --options subvol=@home,noatime,compress=zstd:3 /dev/mapper/cryptroot /mnt/home
+mkdir --parents /mnt/swap
+mount --options subvol=@swap,noatime,compress=zstd:3 /dev/mapper/cryptroot /mnt/swap
+mkdir --parents /mnt/var/cache
+mount --options subvol=@cache,noatime,compress=zstd:3 /dev/mapper/cryptroot /mnt/var/cache
+mkdir --parents /mnt/var/log
+mount --options subvol=@log,noatime,compress=zstd:3 /dev/mapper/cryptroot /mnt/var/log
+mkdir --parents /mnt/boot
+mount /dev/nvme0n1p1 /mnt/boot
+btrfs filesystem mkswapfile --size 32768m /mnt/swap/swapfile
+swapon /mnt/swap/swapfile
+pacstrap -K /mnt base base-devel btrfs-progs cryptsetup dosfstools e2fsprogs util-linux mkinitcpio systemd-resolvconf iwd dhcpcd vim less man-db man-pages tzdata snapper sudo git openssh rsync fish linux-firmware amd-ucode intel-ucode fwupd tpm2-tss tpm2-tools power-profiles-daemon powertop usbutils lm_sensors brightnessctl linux-lts linux linux-lts-headers linux-headers zram-generator limine
+arch-chroot /mnt locale-gen
+arch-chroot /mnt ln --symbolic --force /usr/share/zoneinfo/Europe/Zurich /etc/localtime
+arch-chroot /mnt hwclock --systohc
+arch-chroot /mnt mkinitcpio --allpresets
+arch-chroot /mnt systemctl enable systemd-timesyncd
+arch-chroot /mnt systemctl enable iwd
+arch-chroot /mnt systemctl enable dhcpcd
+arch-chroot /mnt useradd --create-home --shell /usr/bin/fish --groups wheel clement
+arch-chroot /mnt chpasswd
+arch-chroot /mnt passwd --lock root
+arch-chroot /mnt mkdir --parents /boot/EFI/BOOT
+arch-chroot /mnt cp /usr/share/limine/BOOTX64.EFI /boot/EFI/BOOT/BOOTX64.EFI
+systemd-cryptenroll --unlock-key-file=/dev/stdin --tpm2-device=auto --tpm2-pcrs=0+7 /dev/nvme0n1p2
+swapoff --all
+umount --recursive /mnt

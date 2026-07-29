@@ -1,0 +1,44 @@
+# Base system. Without these the result does not boot or cannot be repaired.
+# One package per line. Comments and blank lines are ignored.
+
+base
+base-devel
+
+# Filesystem and encryption tooling must exist in the installed system, not only
+# in the ISO: a broken boot cannot be repaired from its own shell otherwise.
+btrfs-progs
+cryptsetup
+dosfstools
+e2fsprogs
+util-linux
+
+# Initramfs generation. systemd hooks rather than busybox, because both TPM2
+# unlocking and hibernation resume depend on them.
+mkinitcpio
+
+# Networking. iwd rather than wpa_supplicant: fewer moving parts for a laptop
+# that only joins WPA2/WPA3 networks.
+systemd-resolvconf
+iwd
+dhcpcd
+
+# Recovery essentials. A system you cannot edit from a TTY is a system you
+# reinstall instead of repairing.
+vim
+less
+man-db
+man-pages
+
+tzdata
+
+# Snapshots. The rollback story depends on this existing from the start.
+snapper
+
+sudo
+git
+openssh
+rsync
+
+# The default login shell. It has to exist in the target before useradd points an
+# account at it, or the account is created and cannot log in.
+fish

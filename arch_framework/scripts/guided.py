@@ -8,6 +8,7 @@ project.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from ..lib import log
@@ -107,6 +108,7 @@ def run(
     config_path: Path,
     renderer_name: str | None = None,
     from_saved: bool = False,
+    creds_path: Path | None = None,
 ) -> int:
     hardware = Hardware()
     report_environment(hardware)
@@ -145,10 +147,26 @@ def run(
         return 0
 
     # Action.INSTALL
+    # Saved before anything is touched: if the installation fails, the answers
+    # are not lost with it.
     draft.config.save(config_path)
     log.success(f"Configuration saved to {config_path}")
-    log.error(
-        "Installation is not implemented yet (phase 4). The configuration above "
-        "is complete and saved; nothing was written to any disk."
-    )
-    return 2
+
+    from ..lib.installer import install
+    from . import credentials as creds
+
+    interactive = sys.stdin.isatty()
+    collected = creds.collect(draft.config, path=creds_path, interactive=interactive)
+
+    verdict = DeviceHandler().safety(draft.config.disk.target_disk)
+    log.section("Point of no return")
+    log.warn(f"Everything on {draft.config.disk.target_disk} will be destroyed.")
+    log.info(f"Safety check: {verdict}")
+
+    if interactive:
+        answer = input(f"Type {draft.config.disk.target_disk} to continue: ").strip()
+        if answer != draft.config.disk.target_disk:
+            log.warn("Not confirmed. Nothing was changed.")
+            return 130
+
+    return install(draft.config, collected, interactive=interactive)

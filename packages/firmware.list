@@ -1,0 +1,14 @@
+# Firmware and microcode.
+#
+# Microcode is loaded by the bootloader before the kernel and fixes CPU errata;
+# without it a machine can be subtly unstable in ways that look like software
+# bugs. Both vendors are listed because the same configuration is used across
+# Framework models with Intel and AMD boards, and the wrong one is simply unused.
+
+linux-firmware
+amd-ucode
+intel-ucode
+
+# Firmware updates from inside the installed system. Framework ships BIOS
+# updates through LVFS, so this is the supported update path.
+fwupd

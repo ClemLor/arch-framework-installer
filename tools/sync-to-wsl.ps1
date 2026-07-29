@@ -51,7 +51,10 @@ $b64 = Join-Path $work 'src.b64'
 
 Write-Host 'Packing...' -ForegroundColor Cyan
 Remove-Item $tar, $b64 -ErrorAction SilentlyContinue
-tar -czf $tar -C $repo arch_framework tests pyproject.toml
+# packages/, services/ and templates/ are read at runtime, so leaving them out
+# makes every package list resolve to empty and the tests pass against a system
+# with no base packages.
+tar -czf $tar -C $repo arch_framework tests packages services templates pyproject.toml
 [IO.File]::WriteAllText(
     $b64,
     [Convert]::ToBase64String([IO.File]::ReadAllBytes($tar)),
@@ -60,7 +63,9 @@ tar -czf $tar -C $repo arch_framework tests pyproject.toml
 
 Write-Host "Transferring to $Distro`:$RemoteDir ..." -ForegroundColor Cyan
 $extract = "tr -d '\r\n' | tail -c +4 | base64 -d > /tmp/src.tgz && " +
-           "mkdir -p $RemoteDir && rm -rf $RemoteDir/arch_framework $RemoteDir/tests && " +
+           "mkdir -p $RemoteDir && " +
+           "rm -rf $RemoteDir/arch_framework $RemoteDir/tests $RemoteDir/packages " +
+           "$RemoteDir/services $RemoteDir/templates && " +
            "tar -xzf /tmp/src.tgz -C $RemoteDir && echo SYNC_OK"
 Get-Content $b64 -Raw |
     & wsl -d $Distro --exec bash -c $extract 2>&1 |

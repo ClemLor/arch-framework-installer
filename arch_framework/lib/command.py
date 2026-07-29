@@ -65,8 +65,16 @@ class CommandRunner:
         check: bool = True,
         input_text: str | None = None,
         cwd: Path | None = None,
+        stream: bool = False,
     ) -> Result:
-        """Execute a command that may change the system."""
+        """Execute a command that may change the system.
+
+        ``stream`` inherits this process's stdout and stderr instead of
+        capturing them. Required for anything long-running or interactive:
+        ``pacstrap`` runs for minutes and ``arch-chroot`` can wrap a command
+        that prompts, and with output captured the user sees a silent hang and a
+        question nobody can answer.
+        """
         self.journal.append(list(argv))
 
         if self.dry_run:
@@ -76,20 +84,30 @@ class CommandRunner:
         if self.verbose:
             log.info(f"[COMMAND] {_render(argv)}")
 
-        completed = subprocess.run(
-            argv,
-            input=input_text,
-            capture_output=True,
-            text=True,
-            cwd=cwd,
-            check=False,
-        )
-        result = Result(
-            argv=list(argv),
-            returncode=completed.returncode,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
-        )
+        if stream:
+            completed = subprocess.run(
+                argv,
+                input=input_text,
+                text=True,
+                cwd=cwd,
+                check=False,
+            )
+            result = Result(argv=list(argv), returncode=completed.returncode)
+        else:
+            completed = subprocess.run(
+                argv,
+                input=input_text,
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                check=False,
+            )
+            result = Result(
+                argv=list(argv),
+                returncode=completed.returncode,
+                stdout=completed.stdout,
+                stderr=completed.stderr,
+            )
 
         if check and not result.ok:
             raise CommandError(list(argv), result.returncode, result.stderr)
@@ -131,6 +149,21 @@ class CommandRunner:
             raise CommandError(list(argv), completed.returncode, completed.stderr)
 
         return completed.stdout
+
+    def derived(self, argv: list[str], *, placeholder: str) -> str:
+        """Read a value that only exists once an earlier command has run.
+
+        In dry-run mode the filesystem was never created, so ``blkid`` would
+        return nothing and every file templated from it — fstab, crypttab, the
+        bootloader configuration — would render with blanks. That defeats the
+        point of rehearsing. A marked placeholder is substituted instead, so the
+        generated files are reviewable and obviously not real.
+        """
+        if self.dry_run:
+            log.info(f"[DRY-RUN] {_render(argv)} -> {placeholder}")
+            return placeholder
+
+        return self.capture(argv).strip()
 
 
 _runner = CommandRunner()
