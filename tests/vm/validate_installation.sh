@@ -89,7 +89,7 @@ require_validation_commands() {
     # Only list tools required to run the validator itself. Desktop programs
     # such as niri are part of the installation under test and must produce a
     # failed check without aborting the remaining diagnostics.
-    for command_name in btrfs cmp cryptsetup find findmnt grep id jq lsattr lsblk pacman pgrep runuser swapon systemctl; do
+    for command_name in btrfs cmp cryptsetup find findmnt grep id jq lsattr lsblk pacman pgrep runuser snapper swapon systemctl; do
         command -v "${command_name}" >/dev/null || {
             printf 'Missing validation command: %s\n' "${command_name}" >&2
             return 1
@@ -207,6 +207,41 @@ validate_swap_priorities() {
     (( zram_priority > file_priority ))
 }
 
+# A snapper config alone does not mean rollback works.
+#
+# Three things have to hold together: /.snapshots must be its own subvolume (or
+# the root ends up containing its own snapshots), the timers must be running, and
+# the pacman hooks must exist — without those the only snapshots are hourly, and
+# rolling back a bad update would undo an hour of unrelated changes too.
+validate_snapshot_profile() {
+    findmnt --mountpoint /.snapshots >/dev/null || {
+        printf '/.snapshots is not a separate mounted subvolume.\n' >&2
+        return 1
+    }
+
+    [[ -s /etc/snapper/configs/root ]] || return 1
+    systemctl is-enabled --quiet snapper-timeline.timer || return 1
+    systemctl is-enabled --quiet snapper-cleanup.timer || return 1
+
+    [[ -s /etc/snap-pac.ini ]] || {
+        printf 'snap-pac is not configured; important updates would not be flagged.\n' >&2
+        return 1
+    }
+
+    # The hooks are what actually run. Their absence means the package is missing
+    # even though its configuration file is present.
+    find /usr/share/libalpm/hooks -name '*snap-pac*' -print -quit 2>/dev/null |
+        grep -q . || {
+        printf 'snap-pac pacman hooks are not installed.\n' >&2
+        return 1
+    }
+
+    snapper --config root list >/dev/null || {
+        printf 'snapper cannot read the root configuration.\n' >&2
+        return 1
+    }
+}
+
 validate_hibernation_profile() {
     local offset
 
@@ -304,6 +339,7 @@ main() {
     record_check "the kernel is tuned to actually use zram" validate_zram_tuning
     record_check "zram outranks the swapfile" validate_swap_priorities
     record_check "hibernation matches the selected profile" validate_hibernation_profile
+    record_check "snapshots and rollback are usable" validate_snapshot_profile
 
     if (( FAILURES > 0 )); then
         printf '%d post-boot validation check(s) failed.\n' "${FAILURES}" >&2

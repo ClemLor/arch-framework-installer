@@ -42,6 +42,9 @@ verify_core_target_configuration() {
     verify_target_file /etc/vconsole.conf || { error "Final readiness: /etc/vconsole.conf is missing or empty."; return 1; }
     verify_target_file /etc/mkinitcpio.conf || { error "Final readiness: /etc/mkinitcpio.conf is missing or empty."; return 1; }
     verify_target_file /etc/sudoers.d/10-wheel || { error "Final readiness: the wheel sudoers policy is missing."; return 1; }
+    # Snapshot configuration is checked as a whole by
+    # verify_snapshot_configuration, called from verify_installation_readiness.
+    # Its presence is confirmed here so a core-configuration failure names it.
     verify_target_file /etc/snapper/configs/root || { error "Final readiness: the Snapper root profile is missing."; return 1; }
     [[ "$(<"${MOUNT_ROOT}/etc/hostname")" == "${HOSTNAME}" ]] || {
         error "Final readiness: the installed hostname does not match HOSTNAME."
@@ -107,6 +110,7 @@ verify_installation_readiness() {
     verify_readiness_check "zram matches the selected profile" verify_zram_configuration || return 1
     verify_readiness_check "the swapfile is usable" verify_swapfile || return 1
     verify_readiness_check "hibernation is wired end to end" verify_hibernation_configuration || return 1
+    verify_readiness_check "snapshots and rollback are configured" verify_snapshot_configuration || return 1
     verify_readiness_check "the graphical login is configured" verify_graphical_session || return 1
     verify_readiness_check "Limine and boot artifacts are complete" verify_limine || return 1
     verify_readiness_check "the storage security profile is valid" verify_installed_security

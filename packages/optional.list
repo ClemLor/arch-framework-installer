@@ -3,4 +3,8 @@ fish
 fwupd
 kicad
 snapper
+# Pacman hooks that snapshot around every transaction. Without it only the
+# hourly timeline runs, and rolling back a bad update would also undo whatever
+# else happened in the preceding hour.
+snap-pac
 yazi

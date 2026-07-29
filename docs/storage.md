@@ -175,17 +175,59 @@ Cette séparation simplifie les sauvegardes et la maintenance.
 
 # Snapshots
 
-Les snapshots sont gérés par Snapper.
+Snapper gère les snapshots, `snap-pac` les déclenche autour des transactions
+pacman.
 
-Création :
+| Déclencheur | Mécanisme |
+| --- | --- |
+| avant et après chaque transaction pacman | `snap-pac` |
+| horaire | `snapper-timeline.timer` |
+| manuel | `snapper create` |
 
-- avant les mises à jour
-- manuellement
-- automatiquement selon la configuration
+Les deux mécanismes sont nécessaires. Le timeline seul laisserait jusqu'à une
+heure de modifications sans lien entre le dernier snapshot et la mise à jour
+fautive : revenir en arrière annulerait alors bien plus que la mise à jour.
 
-Les snapshots servent principalement à restaurer rapidement un état fonctionnel.
+## Emplacement
 
-Ils ne remplacent pas une sauvegarde.
+`@snapshots` est monté sur `/.snapshots` **avant** l'installation de snapper.
+
+La configuration est donc écrite directement plutôt que via
+`snapper create-config`, qui veut créer `/.snapshots` lui-même et échoue si le
+chemin existe déjà.
+
+Ce montage séparé est ce qui empêche la racine de contenir ses propres
+snapshots — sans quoi un retour arrière ne serait pas propre. La vérification
+finale refuse l'installation si `/.snapshots` n'est pas un point de montage.
+
+Le répertoire est en `750` : un snapshot contient tout ce que contenait la
+racine.
+
+## Rétention
+
+Bornée dans les deux dimensions : `NUMBER_LIMIT="20"` et les limites de timeline
+(6 horaires, 7 quotidiens, 4 hebdomadaires, 2 mensuels). Un Btrfs plein est
+sensiblement plus difficile à récupérer qu'une mise à jour cassée.
+
+`EMPTY_PRE_POST_CLEANUP` supprime les paires où rien n'a changé, sinon chaque
+transaction sans effet laisserait un couple inutile.
+
+`NUMBER_LIMIT_IMPORTANT` ne conserve rien tant que rien n'est marqué important.
+C'est le rôle de `/etc/snap-pac.ini`, qui signale les mises à jour de noyau, de
+`systemd`, de `cryptsetup`, de Limine et les `pacman -Syu` complets. snap-pac
+snapshote la configuration `root` par défaut : ce fichier n'active pas la
+fonctionnalité, il désigne ce qui mérite d'être gardé plus longtemps.
+
+## Limites
+
+Les snapshots servent à restaurer rapidement un état fonctionnel. Ils ne
+remplacent pas une sauvegarde : ils vivent sur le disque qu'ils protègent.
+
+Ils ne couvrent pas `/boot`, qui est en FAT32 hors Btrfs — noyaux et
+`limine.conf` ne reviennent pas en arrière.
+
+La procédure de retour arrière est décrite dans `docs/recovery.md`. `snapper
+rollback` n'est pas utilisable avec cette disposition.
 
 ---
 

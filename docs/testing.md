@@ -24,6 +24,7 @@ bash tests/unit/test_desktop_session.sh
 bash tests/unit/test_zram_configuration.sh
 bash tests/unit/test_swap_configuration.sh
 bash tests/unit/test_hibernation.sh
+bash tests/unit/test_snapshots.sh
 bash tests/unit/test_config_values.sh
 bash tests/unit/test_user_configuration.sh
 bash tests/unit/test_services.sh
@@ -76,6 +77,22 @@ contrôle donc séparément :
 | `resume=` **et** `resume_offset=` | reprise silencieusement remplacée par un démarrage à froid |
 | `resume_offset` égal à l'offset réel | swapfile recréé, décalage périmé |
 | attribut `C` sur le swapfile | copy-on-write, qui corrompt le swapfile |
+
+## Snapshots
+
+Une configuration snapper présente ne signifie pas qu'un retour arrière est
+possible. Le validateur contrôle donc :
+
+| Contrôle | Ce qu'il attrape |
+| --- | --- |
+| `/.snapshots` est un point de montage | racine contenant ses propres snapshots |
+| timers snapper activés | aucun snapshot horaire |
+| `/etc/snap-pac.ini` présent | transactions importantes non signalées |
+| hooks pacman `snap-pac` installés | fichier de configuration présent mais paquet absent |
+| `snapper --config root list` fonctionne | configuration illisible par snapper |
+
+Le contrôle des hooks est distinct de celui du fichier de configuration : le
+second peut exister sans le paquet, et c'est le hook qui s'exécute réellement.
 
 Le contrôle du décalage recalcule la valeur avec
 `btrfs inspect-internal map-swapfile` et la compare à `/proc/cmdline`, plutôt que
